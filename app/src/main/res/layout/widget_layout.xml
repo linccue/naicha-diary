@@ -29,7 +29,8 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <View
+    <!-- 注意这里：把 View 换成了 TextView，这是 RemoteViews 允许的 -->
+    <TextView
         android:layout_width="1dp"
         android:layout_height="30dp"
         android:background="#EEEEEE" />
