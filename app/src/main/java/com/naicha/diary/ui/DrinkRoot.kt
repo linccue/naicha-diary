@@ -96,6 +96,9 @@ import com.naicha.diary.util.TimeUtil
 import com.naicha.diary.util.rememberHaptics
 import kotlinx.coroutines.launch
 import java.io.File
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import com.naicha.diary.widget.DiaryWidget
 
 private data class TabItem(val label: String, val icon: ImageVector)
 
