@@ -38,7 +38,6 @@ private fun WidgetContent(monthCount: Int, dateStr: String, drinkName: String) {
             .fillMaxSize()
             .background(android.graphics.Color.WHITE)
             .padding(14.dp)
-            .appWidgetBackground(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 左侧：约 3 份比例（定宽约 80dp）
