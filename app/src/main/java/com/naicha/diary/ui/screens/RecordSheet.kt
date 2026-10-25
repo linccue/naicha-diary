@@ -204,34 +204,38 @@ fun RecordSheet(
 
         var isSegmenting by remember { mutableStateOf(false) }
 
-               LaunchedEffect(photoImage) {
+                  LaunchedEffect(photoImage) {
         if (photoImage != null) {
             isSegmenting = true
             try {
                 var bitmap: android.graphics.Bitmap? = null
-                // 1. 绕过一切权限，直接通过底层流读取相机照片
                 try {
+                    // 核心改动：使用底层流读取照片，绕过澎湃 OS 的相册权限限制
+                    val options = android.graphics.BitmapFactory.Options()
+                    options.inMutable = true
                     context.contentResolver.openInputStream(photoImage)?.use { input ->
-                        bitmap = android.graphics.BitmapFactory.decodeStream(input)
+                        bitmap = android.graphics.BitmapFactory.decodeStream(input, null, options)
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("CameraDebug", "读取图片异常", e)
+                    e.printStackTrace()
                 }
 
                 if (bitmap != null) {
-                    // 2. 自己存一份原图
+                    // 保存一份原图（以防 AI 失败）
                     val savedFile = java.io.File(context.filesDir, "photo_${System.currentTimeMillis()}.jpg")
                     val out = java.io.FileOutputStream(savedFile)
                     bitmap!!.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
                     out.close()
                     photoName = savedFile.name
 
-                    // 3. 后台开始本地 AI 抠图
+                    // 开始调用本地 AI 进行抠图
                     withContext(Dispatchers.IO) {
                         try {
                             U2NetSegmenter.init(context)
                             val result = U2NetSegmenter.removeBackground(bitmap!!)
+                            
                             if (result != null) {
+                                // 抠图成功，保存为 PNG 格式（PNG 才能保留透明背景）
                                 val newFile = java.io.File(context.filesDir, "seg_${savedFile.nameWithoutExtension}.png")
                                 val out2 = java.io.FileOutputStream(newFile)
                                 result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out2)
@@ -239,26 +243,26 @@ fun RecordSheet(
                                 photoName = newFile.name
                             } else {
                                 withContext(Dispatchers.Main) {
-                                    android.widget.Toast.makeText(context, "抠图失败，保留原图", android.widget.Toast.LENGTH_SHORT).show()
+                                    android.widget.Toast.makeText(context, "抠图未识别到主体，保留原图", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             }
                         } catch (e: Exception) {
                             e.printStackTrace()
                             withContext(Dispatchers.Main) {
-                                android.widget.Toast.makeText(context, "AI 出错: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(context, "本地 AI 出错", android.widget.Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(context, "无法解析图片", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, "无法解析照片，请重试", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 isSegmenting = false
-                onPhotoImageConsumed()
+                onPhotoImageConsumed() // 无论成功失败，必须通知系统回收资源
             }
         }
     }
