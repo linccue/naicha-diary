@@ -42,6 +42,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -126,7 +130,10 @@ fun RecordSheet(
     var mood by remember { mutableStateOf(initial?.mood ?: "😋") }
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var photoName by remember { mutableStateOf(initial?.photoPath) }
-
+    var showDatePicker by remember { mutableStateOf(false) }
+    var selectedDate by remember {
+        mutableStateOf(initial?.timestamp ?: System.currentTimeMillis())
+    }
     var aiLoading by remember { mutableStateOf(false) }
     var aiMessage by remember { mutableStateOf<String?>(null) }
 
@@ -495,7 +502,31 @@ fun RecordSheet(
                         )
                     }
                 }
-
+                item {
+                    FieldGroup(title = "日期") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .clickable { showDatePicker = true }
+                                .padding(horizontal = 14.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = formatDrinkDate(selectedDate),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                text = "修改",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = brandColor,
+                            )
+                        }
+                    }
+                }                
                 item { Spacer(Modifier.height(4.dp)) }
             }
 
@@ -539,6 +570,7 @@ fun RecordSheet(
                             mood = mood,
                             note = note.trim(),
                             photoPath = photoName,
+                            timestamp = selectedDate,
                         )
                         onSave(item)
                     },
@@ -554,6 +586,27 @@ fun RecordSheet(
                     },
                 )
             }
+        }
+    }
+        if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = timestampToDatePickerMillis(selectedDate)
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { picked ->
+                        selectedDate = datePickerMillisToTimestamp(picked)
+                    }
+                    showDatePicker = false
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("取消") }
+            },
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }
@@ -872,4 +925,26 @@ private fun softLiquid(color: Color): Color = Color(
     blue = color.blue * 0.62f + 0.38f,
     alpha = 1f,
 )
+private fun timestampToDatePickerMillis(timestamp: Long): Long =
+    java.time.Instant.ofEpochMilli(timestamp)
+        .atZone(java.time.ZoneId.systemDefault())
+        .toLocalDate()
+        .atStartOfDay(java.time.ZoneOffset.UTC)
+        .toInstant()
+        .toEpochMilli()
 
+private fun datePickerMillisToTimestamp(datePickerMillis: Long): Long {
+    val date = java.time.Instant.ofEpochMilli(datePickerMillis)
+        .atZone(java.time.ZoneOffset.UTC)
+        .toLocalDate()
+    return date.atTime(java.time.LocalTime.now())
+        .atZone(java.time.ZoneId.systemDefault())
+        .toInstant()
+        .toEpochMilli()
+}
+
+private fun formatDrinkDate(timestamp: Long): String =
+    java.time.Instant.ofEpochMilli(timestamp)
+        .atZone(java.time.ZoneId.systemDefault())
+        .toLocalDate()
+        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年M月d日"))
