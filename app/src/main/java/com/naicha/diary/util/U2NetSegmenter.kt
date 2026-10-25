@@ -70,7 +70,8 @@ object U2NetSegmenter {
 
             // 4. 获取 AI 画出的“遮罩”（黑白图，白色是奶茶，黑色是背景）
             val outputTensor = results[0] as OnnxTensor
-            val outputBuffer = outputTensor.floatBuffer
+// 直接获取多维数组，最稳
+val maskArray = (outputTensor.value as Array<Array<Array<FloatArray>>>)[0][0].flatMap { it.toList() }.toFloatArray()
             val maskData = FloatArray(320 * 320)
             outputBuffer.get(maskData)
 
