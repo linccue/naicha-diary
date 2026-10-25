@@ -20,18 +20,17 @@
         android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.Drink">
 
-        <receiver
-    android:name=".widget.DiaryWidget"
-    android:exported="true">
-    android:label="@string/app_name">
-    <intent-filter>
-        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-    </intent-filter>
-    <meta-data
-        android:name="android.appwidget.provider"
-        android:resource="@xml/widget_info" />
+           <receiver
+            android:label="饮品日记 - 横幅"
+            android:name="com.naicha.diary.widget.DiaryWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
         </receiver>
-        
         <activity
             android:name=".MainActivity"
             android:exported="true"
