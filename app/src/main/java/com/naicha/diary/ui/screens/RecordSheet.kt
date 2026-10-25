@@ -197,10 +197,41 @@ fun RecordSheet(
         }
     }
 
+      // 新增一个状态，用来临时保存抠好的图
+    var isSegmenting by remember { mutableStateOf(false) }
+
     LaunchedEffect(photoImage) {
         if (photoImage != null) {
+            // 1. 先保存用户选的原始照片
             val saved = withContext(Dispatchers.IO) { PhotoStore.save(context, photoImage) }
-            if (saved != null) photoName = saved
+            if (saved != null) {
+                photoName = saved
+                
+                // 2. 自动开始抠图
+                isSegmenting = true
+                scope.launch {
+                    val file = PhotoStore.fileOf(saved)
+                    val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                    
+                    if (bitmap != null) {
+                        // 召唤本地 AI 抠图
+                        val result = com.naicha.diary.util.ImageSegmenter.removeBackground(context, bitmap)
+                        
+                        if (result != null) {
+                            // 3. 把抠好的透明图存进手机，替换掉原图
+                            val newFile = File(file.parentFile, "seg_${file.name}")
+                            val out = java.io.FileOutputStream(newFile)
+                            // 存为 PNG 格式，这样才能保留透明背景
+                            result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                            out.close()
+                            
+                            // 4. 更新状态，让界面显示抠好的图
+                            photoName = newFile.name
+                        }
+                    }
+                    isSegmenting = false
+                }
+            }
             onPhotoImageConsumed()
         }
     }
