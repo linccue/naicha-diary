@@ -140,8 +140,26 @@ fun DrinkRoot() {
     ) { success ->
         val target = pendingCameraUri
         pendingCameraUri = null
-        if (success) {
-             if (pickForAi) aiImage = target else photoImage = target
+           if (success) {
+            val safeFile = java.io.File(context.filesDir, "cam_safe_${System.currentTimeMillis()}.jpg")
+            try {
+                // 趁系统相机还没收回权限，立刻把照片复制到自己的地盘
+                context.contentResolver.openInputStream(target!!)?.use { input ->
+                    safeFile.outputStream().use { output -> input.copyTo(output) }
+                }
+                // 生成一个新的绝对安全的 Uri 传进去
+                val safeUri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    safeFile
+                )
+                if (pickForAi) aiImage = safeUri else photoImage = safeUri
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // 如果复制失败，退而求其次传原 Uri
+                if (pickForAi) aiImage = target else photoImage = target
+            }
+            
             if (openSheetAfterPick) {
                 editing = null
                 showRecord = true
