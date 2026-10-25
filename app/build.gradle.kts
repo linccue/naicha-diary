@@ -105,6 +105,8 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")
+    implementation("org.opencv:opencv:4.9.0")
 }
 
 kotlin {
