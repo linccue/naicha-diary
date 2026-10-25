@@ -285,6 +285,17 @@ fun DrinkRoot() {
             onAiImageConsumed = { aiImage = null },
             onPhotoImageConsumed = { photoImage = null },
             onSave = { drink ->
+                // 通知桌面小部件刷新数据
+val manager = AppWidgetManager.getInstance(context.applicationContext)
+val component = ComponentName(context, DiaryWidget::class.java)
+val ids = manager.getAppWidgetIds(component)
+if (ids.isNotEmpty()) {
+    val intent = android.content.Intent(context, DiaryWidget::class.java).apply {
+        action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+    }
+    context.sendBroadcast(intent)
+}
                 if (editing == null) repository.add(drink) else repository.update(drink)
                 showRecord = false
                 editing = null
