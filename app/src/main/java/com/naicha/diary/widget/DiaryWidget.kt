@@ -58,8 +58,8 @@ private fun WidgetContent(monthCount: Int, dateStr: String, drinkName: String) {
             )
         }
 
-        // 中间：竖线分隔
-        Box(
+                // 中间：竖线分隔
+        Spacer(
             modifier = GlanceModifier
                 .width(1.dp)
                 .height(30.dp)
@@ -73,7 +73,7 @@ private fun WidgetContent(monthCount: Int, dateStr: String, drinkName: String) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // 绿色小圆点用固定宽的短横线代替（Glance画圆需要额外资源）
-                Box(modifier = GlanceModifier.width(8.dp).height(8.dp).background(android.graphics.Color.parseColor("#A5D6A7")))
+                Spacer(modifier = GlanceModifier.width(8.dp).height(8.dp).background(android.graphics.Color.parseColor("#A5D6A7")))
                 Spacer(modifier = GlanceModifier.width(6.dp))
                 Text(
                     text = "${dateStr} 喝过",
