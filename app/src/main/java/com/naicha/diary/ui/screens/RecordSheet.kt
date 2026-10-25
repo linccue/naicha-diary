@@ -505,47 +505,56 @@ fun RecordSheet(
                     FieldGroup(title = "照片", subtitle = "可选") {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val preview = photoName
-                            if (preview != null) {
-                                                        if (isSegmenting) {
-                            Box(
-                                modifier = Modifier
-                                    .size(84.dp)
-                                    .clip(MaterialTheme.shapes.medium)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp,
+                            
+                            if (isSegmenting) {
+                                // AI 正在抠图，显示一个转圈圈
+                                Box(
+                                    modifier = Modifier
+                                        .size(84.dp)
+                                        .clip(MaterialTheme.shapes.medium)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp,
+                                        color = brandColor
+                                    )
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    text = "AI 正在抠图…",
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = brandColor
                                 )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                        }
-                        // 下面紧跟着原来的 LocalPhoto(...)
+                            } else if (preview != null) {
+                                // 抠图完成，显示照片（如果是抠好的，背景自动变透明）
                                 LocalPhoto(
                                     file = PhotoStore.fileOf(preview),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .size(84.dp)
-                                        .clip(MaterialTheme.shapes.medium),
+                                        .clip(MaterialTheme.shapes.medium)
                                 )
                                 Spacer(Modifier.width(12.dp))
                             }
-                            PhotoButton(text = "相册", emoji = "🖼") { onPick(false, false) }
-                            Spacer(Modifier.width(10.dp))
-                            PhotoButton(text = "拍照", emoji = "📷") { onPick(false, true) }
-                            if (preview != null) {
+                            
+                            // 只有在没有正在抠图时，才显示“相册”和“拍照”按钮，防止冲突
+                            if (!isSegmenting) {
+                                PhotoButton(text = "相册", emoji = "🖼") { onPick(false, false) }
                                 Spacer(Modifier.width(10.dp))
-                                PhotoButton(text = "移除", emoji = "✕") {
-                                    PhotoStore.delete(preview)
-                                    photoName = null
+                                PhotoButton(text = "拍照", emoji = "📷") { onPick(false, true) }
+                                if (preview != null) {
+                                    Spacer(Modifier.width(10.dp))
+                                    PhotoButton(text = "移除", emoji = "✕") {
+                                        PhotoStore.delete(preview)
+                                        photoName = null
+                                    }
                                 }
                             }
                         }
                     }
                 }
-
                 item {
                     FieldGroup(title = "备注", subtitle = "可选") {
                         OutlinedTextField(
