@@ -7,9 +7,9 @@
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingStart="14dp"
-    android:paddingTop="8dp"
+    android:paddingTop="4dp"
     android:paddingEnd="14dp"
-    android:paddingBottom="8dp">
+    android:paddingBottom="4dp">
 
     <!-- ================= 左侧区域 4 : 6 比例 ================= -->
     <LinearLayout
@@ -19,10 +19,10 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <!-- 猫咪缩小到 30dp -->
+        <!-- 猫咪缩小到 24dp -->
         <ImageView
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:src="@drawable/widget_cat"
             android:scaleType="fitCenter" />
 
@@ -34,7 +34,7 @@
             android:gravity="center"
             android:orientation="vertical">
 
-            <!-- 标签稍微缩小 -->
+            <!-- MONTH 标签压扁 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -45,16 +45,16 @@
                 android:paddingBottom="1dp"
                 android:text="MONTH"
                 android:textColor="#CCFF00"
-                android:textSize="8sp"
+                android:textSize="9sp"
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:maxLines="1" />
 
-            <!-- 大数字缩小到 24sp -->
+            <!-- 大数字缩小到 20sp -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
+                android:layout_marginTop="0dp"
                 android:orientation="horizontal"
                 android:gravity="bottom">
                 
@@ -64,25 +64,25 @@
                     android:layout_height="wrap_content"
                     android:text="0"
                     android:textColor="#000000"
-                    android:textSize="24sp"
+                    android:textSize="20sp"
                     android:textStyle="bold" />
                 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="2dp"
-                    android:layout_marginBottom="3dp"
+                    android:layout_marginBottom="2dp"
                     android:text="杯"
                     android:textColor="#888888"
-                    android:textSize="11sp" />
+                    android:textSize="10sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 中间竖线变短 -->
+    <!-- 中间竖线缩短到 20dp -->
     <TextView
         android:layout_width="1dp"
-        android:layout_height="28dp"
+        android:layout_height="20dp"
         android:background="#E0E0E0" />
 
     <!-- ================= 右侧区域 4 : 6 比例 ================= -->
@@ -101,8 +101,8 @@
             android:orientation="horizontal">
 
             <TextView
-                android:layout_width="6dp"
-                android:layout_height="6dp"
+                android:layout_width="5dp"
+                android:layout_height="5dp"
                 android:background="@drawable/dot_green" />
 
             <TextView
@@ -112,18 +112,18 @@
                 android:layout_marginStart="4dp"
                 android:text="--"
                 android:textColor="#888888"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
         </LinearLayout>
 
-        <!-- 饮品名称字号缩小到 16sp -->
+        <!-- 饮品名称字号缩小到 14sp -->
         <TextView
             android:id="@+id/tv_drink_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
+            android:layout_marginTop="0dp"
             android:text="暂无记录"
             android:textColor="#1C1C1E"
-            android:textSize="16sp"
+            android:textSize="14sp"
             android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end" />
