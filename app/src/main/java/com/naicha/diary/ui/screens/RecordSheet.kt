@@ -120,14 +120,14 @@ fun RecordSheet(
     var brand by remember { mutableStateOf(initial?.brand ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var cupSize by remember { mutableStateOf(initial?.cupSize ?: "中杯") }
-    var sugar by remember { mutableStateOf(initial?.sugar ?: "半糖") }
-    var ice by remember { mutableStateOf(initial?.ice ?: "少冰") }
+    var sugar by remember { mutableStateOf(initial?.sugar ?: "七分糖") }
+        var ice by remember { mutableStateOf(initial?.ice ?: "") } // 留空，不默认选择
     var toppings by remember { mutableStateOf(initial?.toppings ?: emptyList()) }
     var priceText by remember {
         mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "")
     }
-    var rating by remember { mutableIntStateOf(initial?.rating ?: 5) }
-    var mood by remember { mutableStateOf(initial?.mood ?: "😋") }
+     var rating by remember { mutableIntStateOf(initial?.rating ?: 0) } // 0 表示未评分
+        var mood by remember { mutableStateOf(initial?.mood ?: "") } // 留空，不默认选择
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var photoName by remember { mutableStateOf(initial?.photoPath) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -147,10 +147,13 @@ fun RecordSheet(
         if (brand.isNotBlank() && Catalog.brandOf(brand).category != next) brand = ""
         val sizes = Catalog.sizesFor(next)
         if (cupSize !in sizes) cupSize = sizes.getOrElse(1) { sizes.first() }
-        val sugars = Catalog.sugarOptions(next)
-        if (sugar !in sugars) sugar = sugars.first()
+               val sugars = Catalog.sugarOptions(next)
+        // 如果当前选的不在新列表里，且不是空，回退到七分糖；如果是空就保持空
+        if (sugar !in sugars && sugar.isNotBlank()) sugar = "七分糖"
+        
         val ices = Catalog.iceOptions(next)
-        if (ice !in ices) ice = ices.first()
+        // 如果当前选的不在新列表里，直接清空，让用户自己选
+        if (ice !in ices && ice.isNotBlank()) ice = "" 
         val extras = Catalog.extraOptions(next)
         toppings = toppings.filter { it in extras }
     }
@@ -790,9 +793,13 @@ private fun PreviewRow(
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    RatingStars(rating = rating, starSize = 14.dp)
+                                       if (rating > 0) {
+                        RatingStars(rating = rating, starSize = 14.dp)
+                    }
                     Spacer(Modifier.width(8.dp))
-                    Text(text = mood, fontSize = 16.sp)
+                      if (mood.isNotBlank()) {
+                        Text(text = mood, fontSize = 16.sp)
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
