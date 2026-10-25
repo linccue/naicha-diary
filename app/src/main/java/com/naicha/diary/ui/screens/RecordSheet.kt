@@ -200,60 +200,55 @@ fun RecordSheet(
         }
     }
 
-       LaunchedEffect(photoImage) {
+    LaunchedEffect(photoImage) {
         if (photoImage != null) {
-            isSegmenting = true
-            try {
-                var bitmap: Bitmap? = null
-                try {
-                    val options = BitmapFactory.Options()
-                    options.inMutable = true
-                    context.contentResolver.openInputStream(photoImage)?.use { input ->
-                        bitmap = BitmapFactory.decodeStream(input, null, options)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-
-                if (bitmap != null) {
-                    previewBitmap = bitmap
-                    
-                    // 👇 这里改成了 PhotoStore.fileOf，确保存入正确的文件夹
-                    val savedFile = PhotoStore.fileOf("photo_${System.currentTimeMillis()}.jpg")
-                    FileOutputStream(savedFile).use { bitmap!!.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                    photoName = savedFile.name
-
-                    withContext(Dispatchers.IO) {
-                        try {
-                            U2NetSegmenter.init(context)
-                            val result = U2NetSegmenter.removeBackground(bitmap!!)
-                            if (result != null) {
-                                withContext(Dispatchers.Main) { previewBitmap = result }
-                                
-                                // 👇 这里也改成了 PhotoStore.fileOf，确保透明图存入正确的文件夹
-                                val newFile = PhotoStore.fileOf("seg_${savedFile.nameWithoutExtension}.png")
-                                FileOutputStream(newFile).use { result.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                                photoName = newFile.name
-                            } else {
-                                withContext(Dispatchers.Main) {
-                                    android.widget.Toast.makeText(context, "抠图未识别到主体，保留原图", android.widget.Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }
-                } else {
-                    android.util.Log.e("PhotoDebug", "bitmap 读取为空")
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                isSegmenting = false
-                onPhotoImageConsumed()
-            }
+            val saved = withContext(Dispatchers.IO) { PhotoStore.save(context, photoImage) }
+            if (saved != null) photoName = saved
+            onPhotoImageConsumed()
         }
     }
+
+    val sheetBackground by animateColorAsState(
+        targetValue = lerp(MaterialTheme.colorScheme.background, brandColor, 0.09f),
+        animationSpec = tween(420),
+        label = "sheetBackground",
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = sheetBackground,
+        dragHandle = { SheetHandle() },
+    ) {
+        Column(modifier = Modifier.fillMaxHeight(0.94f)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (initial == null) "记一杯" else "编辑记录",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Spacer(Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "关闭",
+                        tint = PearlSoft,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
