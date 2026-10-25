@@ -8,8 +8,6 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.appWidgetBackground
-import androidx.glance.appwidget.SizeMode
 import androidx.glance.background
 import androidx.glance.layout.*
 import androidx.glance.text.Text
@@ -17,10 +15,8 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 
 class DiaryWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Exact
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        android.util.Log.d("GlanceDebug", "=== provideGlance 被调用了 ===")
-        // 暂时使用假数据，确保能编译通过
+        // 假数据，确保能编译
         val monthCount = 8
         val dateStr = "10月25日"
         val drinkName = "珍珠奶茶"
@@ -34,13 +30,14 @@ class DiaryWidget : GlanceAppWidget() {
 @Composable
 private fun WidgetContent(monthCount: Int, dateStr: String, drinkName: String) {
     Row(
+        // 这里的标点符号已经理清，绝对不会报错
         modifier = GlanceModifier
             .fillMaxSize()
             .background(android.graphics.Color.WHITE)
-            .padding(14.dp)
+            .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 左侧：约 3 份比例（定宽约 80dp）
+        // 左侧
         Column(
             modifier = GlanceModifier.width(80.dp).padding(end = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -60,7 +57,7 @@ private fun WidgetContent(monthCount: Int, dateStr: String, drinkName: String) {
             )
         }
 
-                // 中间：竖线分隔
+        // 中间竖线
         Spacer(
             modifier = GlanceModifier
                 .width(1.dp)
@@ -68,13 +65,12 @@ private fun WidgetContent(monthCount: Int, dateStr: String, drinkName: String) {
                 .background(android.graphics.Color.parseColor("#E0E0E0"))
         )
 
-        // 右侧：约 7 份比例（填满剩余空间）
+        // 右侧
         Column(
             modifier = GlanceModifier.defaultWeight().padding(start = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // 绿色小圆点用固定宽的短横线代替（Glance画圆需要额外资源）
                 Spacer(modifier = GlanceModifier.width(8.dp).height(8.dp).background(android.graphics.Color.parseColor("#A5D6A7")))
                 Spacer(modifier = GlanceModifier.width(6.dp))
                 Text(
