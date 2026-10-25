@@ -497,6 +497,23 @@ fun RecordSheet(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val preview = photoName
                             if (preview != null) {
+                                                        if (isSegmenting) {
+                            Box(
+                                modifier = Modifier
+                                    .size(84.dp)
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                    color = brandColor
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                        }
+                        // 下面紧跟着原来的 LocalPhoto(...)
                                 LocalPhoto(
                                     file = PhotoStore.fileOf(preview),
                                     contentScale = ContentScale.Crop,
