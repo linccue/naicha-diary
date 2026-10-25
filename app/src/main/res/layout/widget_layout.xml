@@ -21,8 +21,8 @@
 
         <!-- 猫咪固定在左侧 -->
         <ImageView
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="31dp"
+            android:layout_height="31dp"
             android:src="@drawable/widget_cat"
             android:scaleType="fitCenter" />
 
