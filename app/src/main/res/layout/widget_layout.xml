@@ -15,14 +15,14 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="3"
+        android:layout_weight="4"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <!-- 猫咪图片缩小到了 36dp -->
         <ImageView
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
             android:src="@drawable/widget_cat"
             android:scaleType="fitCenter" />
 
@@ -43,7 +43,7 @@
                 android:paddingBottom="2dp"
                 android:text="MONTH"
                 android:textColor="#CCFF00"
-                android:textSize="10sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:maxLines="1" />
@@ -89,7 +89,7 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="7"
+        android:layout_weight="6"
         android:orientation="vertical">
 
         <!-- 绿点 + 日期 -->
