@@ -200,8 +200,7 @@ fun RecordSheet(
         }
     }
 
-      // 新增一个状态，用来临时保存抠好的图
-    var isSegmenting by remember { mutableStateOf(false) }
+
 
         var isSegmenting by remember { mutableStateOf(false) }
 
