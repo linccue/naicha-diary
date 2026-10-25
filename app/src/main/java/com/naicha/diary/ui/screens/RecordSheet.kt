@@ -182,7 +182,7 @@ var rating by remember { mutableIntStateOf(initial?.rating ?: 0) } // 0 表示�
                 if (bitmap != null) {
                     previewBitmap = bitmap
                     
-                    val savedFile = File(context.filesDir, "photo_${System.currentTimeMillis()}.jpg")
+                   val savedFile = PhotoStore.fileOf("photo_${System.currentTimeMillis()}.jpg")
                     FileOutputStream(savedFile).use { bitmap!!.compress(Bitmap.CompressFormat.JPEG, 90, it) }
                     photoName = savedFile.name
 
@@ -192,7 +192,7 @@ var rating by remember { mutableIntStateOf(initial?.rating ?: 0) } // 0 表示�
                             val result = U2NetSegmenter.removeBackground(bitmap!!)
                             if (result != null) {
                                 withContext(Dispatchers.Main) { previewBitmap = result }
-                                val newFile = File(context.filesDir, "seg_${savedFile.nameWithoutExtension}.png")
+                                                                val newFile = PhotoStore.fileOf("seg_${savedFile.nameWithoutExtension}.png")
                                 FileOutputStream(newFile).use { result.compress(Bitmap.CompressFormat.PNG, 100, it) }
                                 photoName = newFile.name
                             } else {
