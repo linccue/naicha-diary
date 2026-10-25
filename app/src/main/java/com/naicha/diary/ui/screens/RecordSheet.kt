@@ -94,6 +94,9 @@ import com.naicha.diary.util.PhotoStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.graphics.BitmapFactory
+import com.naicha.diary.util.ImageSegmenter
+import java.io.FileOutputStream
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
