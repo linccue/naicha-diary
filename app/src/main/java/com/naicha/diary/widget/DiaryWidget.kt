@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.*
@@ -15,6 +16,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 
 class DiaryWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Exact
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         // 假数据，确保能编译
         val monthCount = 8
