@@ -287,6 +287,8 @@ fun DrinkRoot() {
                 editing = null
                 aiImage = null
                 photoImage = null
+                // 通知小组件刷新数据
+                androidx.glance.appwidget.updateAll(DiaryWidget::class.java, context)
             },
             onDelete = { drink ->
                 repository.remove(drink.id)
