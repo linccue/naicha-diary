@@ -9,6 +9,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
+        
         android:name=".DrinkApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -20,6 +21,10 @@
         android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.Drink">
 
+        <meta-data
+    android:name="com.google.mlkit.vision.DEPENDENCIES"
+    android:value="subject_segment" />
+        
            <receiver
             android:label="饮品日记 - 横幅"
             android:name="com.naicha.diary.widget.DiaryWidget"
