@@ -204,48 +204,54 @@ fun RecordSheet(
 
         var isSegmenting by remember { mutableStateOf(false) }
 
-            LaunchedEffect(photoImage) {
+               LaunchedEffect(photoImage) {
         if (photoImage != null) {
             isSegmenting = true
             try {
-                val saved = withContext(Dispatchers.IO) { PhotoStore.save(context, photoImage) }
-                if (saved != null) {
-                    photoName = saved
+                var bitmap: android.graphics.Bitmap? = null
+                // 1. 绕过一切权限，直接通过底层流读取相机照片
+                try {
+                    context.contentResolver.openInputStream(photoImage)?.use { input ->
+                        bitmap = android.graphics.BitmapFactory.decodeStream(input)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("CameraDebug", "读取图片异常", e)
+                }
+
+                if (bitmap != null) {
+                    // 2. 自己存一份原图
+                    val savedFile = java.io.File(context.filesDir, "photo_${System.currentTimeMillis()}.jpg")
+                    val out = java.io.FileOutputStream(savedFile)
+                    bitmap!!.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                    out.close()
+                    photoName = savedFile.name
+
+                    // 3. 后台开始本地 AI 抠图
                     withContext(Dispatchers.IO) {
                         try {
-                            // 1. 初始化本地 AI (第一次大概会卡 1~2 秒加载模型)
                             U2NetSegmenter.init(context)
-                            
-                            // 2. 读取图片
-                            val file = PhotoStore.fileOf(saved)
-                            val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-                            
-                            if (bitmap != null) {
-                                // 3. 执行纯本地抠图
-                                val result = U2NetSegmenter.removeBackground(bitmap)
-                                
-                                if (result != null) {
-                                    val newFile = java.io.File(file.parentFile, "seg_${file.nameWithoutExtension}.png")
-                                    val out = java.io.FileOutputStream(newFile)
-                                    result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                                    out.close()
-                                    photoName = newFile.name
-                                } else {
-                                    withContext(Dispatchers.Main) {
-                                        android.widget.Toast.makeText(context, "抠图处理失败，保留原图", android.widget.Toast.LENGTH_SHORT).show()
-                                    }
+                            val result = U2NetSegmenter.removeBackground(bitmap!!)
+                            if (result != null) {
+                                val newFile = java.io.File(context.filesDir, "seg_${savedFile.nameWithoutExtension}.png")
+                                val out2 = java.io.FileOutputStream(newFile)
+                                result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out2)
+                                out2.close()
+                                photoName = newFile.name
+                            } else {
+                                withContext(Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, "抠图失败，保留原图", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             }
                         } catch (e: Exception) {
                             e.printStackTrace()
                             withContext(Dispatchers.Main) {
-                                android.widget.Toast.makeText(context, "本地 AI 出错: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                                android.widget.Toast.makeText(context, "AI 出错: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(context, "读取图片失败", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, "无法解析图片", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
@@ -256,7 +262,6 @@ fun RecordSheet(
             }
         }
     }
-
     val sheetBackground by animateColorAsState(
         targetValue = lerp(MaterialTheme.colorScheme.background, brandColor, 0.09f),
         animationSpec = tween(420),
