@@ -102,6 +102,7 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.haze)
+    implementation("androidx.glance:glance-appwidget:1.1.1")
 }
 
 kotlin {
