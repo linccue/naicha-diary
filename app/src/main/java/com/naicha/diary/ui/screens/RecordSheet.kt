@@ -205,42 +205,40 @@ fun RecordSheet(
 
         var isSegmenting by remember { mutableStateOf(false) }
 
-                  LaunchedEffect(photoImage) {
+    LaunchedEffect(photoImage) {
         if (photoImage != null) {
             isSegmenting = true
             try {
                 var bitmap: android.graphics.Bitmap? = null
                 try {
-                    // 核心改动：使用底层流读取照片，绕过澎湃 OS 的相册权限限制
-                    val options = android.graphics.BitmapFactory.Options()
-                    options.inMutable = true
                     context.contentResolver.openInputStream(photoImage)?.use { input ->
-                        bitmap = android.graphics.BitmapFactory.decodeStream(input, null, options)
+                        bitmap = android.graphics.BitmapFactory.decodeStream(input)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
 
                 if (bitmap != null) {
-                    // 保存一份原图（以防 AI 失败）
+                    // 立刻在界面上显示原图
+                    previewBitmap = bitmap
+                    
+                    // 保存原图到安全目录（给保存记录用）
                     val savedFile = java.io.File(context.filesDir, "photo_${System.currentTimeMillis()}.jpg")
-                    val out = java.io.FileOutputStream(savedFile)
-                    bitmap!!.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
-                    out.close()
+                    java.io.FileOutputStream(savedFile).use { bitmap!!.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
                     photoName = savedFile.name
 
-                    // 开始调用本地 AI 进行抠图
+                    // 开始后台抠图
                     withContext(Dispatchers.IO) {
                         try {
                             U2NetSegmenter.init(context)
                             val result = U2NetSegmenter.removeBackground(bitmap!!)
-                            
                             if (result != null) {
-                                // 抠图成功，保存为 PNG 格式（PNG 才能保留透明背景）
+                                // 抠图成功，更新界面显示透明图
+                                withContext(Dispatchers.Main) { previewBitmap = result }
+                                
+                                // 保存透明图
                                 val newFile = java.io.File(context.filesDir, "seg_${savedFile.nameWithoutExtension}.png")
-                                val out2 = java.io.FileOutputStream(newFile)
-                                result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out2)
-                                out2.close()
+                                java.io.FileOutputStream(newFile).use { result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
                                 photoName = newFile.name
                             } else {
                                 withContext(Dispatchers.Main) {
@@ -249,24 +247,22 @@ fun RecordSheet(
                             }
                         } catch (e: Exception) {
                             e.printStackTrace()
-                            withContext(Dispatchers.Main) {
-                                android.widget.Toast.makeText(context, "本地 AI 出错", android.widget.Toast.LENGTH_SHORT).show()
-                            }
                         }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(context, "无法解析照片，请重试", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, "无法解析照片", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 isSegmenting = false
-                onPhotoImageConsumed() // 无论成功失败，必须通知系统回收资源
+                onPhotoImageConsumed()
             }
         }
     }
+    
     val sheetBackground by animateColorAsState(
         targetValue = lerp(MaterialTheme.colorScheme.background, brandColor, 0.09f),
         animationSpec = tween(420),
@@ -549,14 +545,14 @@ fun RecordSheet(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = brandColor
                                 )
-                            } else if (preview != null) {
-                                // 抠图完成，显示照片（如果是抠好的，背景自动变透明）
-                                LocalPhoto(
-                                    file = PhotoStore.fileOf(preview),
-                                    contentScale = ContentScale.Crop,
+                              } else if (previewBitmap != null) {
+                                androidx.compose.foundation.Image(
+                                    bitmap = previewBitmap!!.asImageBitmap(),
+                                    contentDescription = "照片",
                                     modifier = Modifier
                                         .size(84.dp)
-                                        .clip(MaterialTheme.shapes.medium)
+                                        .clip(MaterialTheme.shapes.medium),
+                                    contentScale = ContentScale.Crop
                                 )
                                 Spacer(Modifier.width(12.dp))
                             }
