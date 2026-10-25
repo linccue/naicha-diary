@@ -11,7 +11,7 @@
     android:paddingEnd="16dp"
     android:paddingBottom="12dp">
 
-    <!-- ================= 左侧区域 ================= -->
+    <!-- ================= 左侧区域 4 : 6 比例 (占 4 份) ================= -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
@@ -19,20 +19,23 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <!-- 猫咪图片缩小到了 36dp -->
+        <!-- 猫咪固定在左侧 -->
         <ImageView
-            android:layout_width="25dp"
-            android:layout_height="25dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:src="@drawable/widget_cat"
             android:scaleType="fitCenter" />
 
+        <!-- 文字区域：填满猫咪和竖线之间的剩余空间，并居中 -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:gravity="center"
             android:orientation="vertical">
 
-            <!-- 改成了 MONTH，并强制单行不换行 -->
+            <!-- 改成了 MONTH，单行显示 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -43,7 +46,7 @@
                 android:paddingBottom="2dp"
                 android:text="MONTH"
                 android:textColor="#CCFF00"
-                android:textSize="8sp"
+                android:textSize="10sp"
                 android:textStyle="bold"
                 android:singleLine="true"
                 android:maxLines="1" />
@@ -81,16 +84,15 @@
     <TextView
         android:layout_width="1dp"
         android:layout_height="35dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="12dp"
         android:background="#E0E0E0" />
 
-    <!-- ================= 右侧区域 ================= -->
+    <!-- ================= 右侧区域 4 : 6 比例 (占 6 份) ================= -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="6"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingStart="12dp">
 
         <!-- 绿点 + 日期 -->
         <LinearLayout
@@ -99,7 +101,6 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <!-- 使用刚画的 8dp 绿点 -->
             <TextView
                 android:layout_width="8dp"
                 android:layout_height="8dp"
