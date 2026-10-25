@@ -19,6 +19,7 @@ import androidx.glance.unit.ColorProvider
 class DiaryWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        android.util.Log.d("GlanceDebug", "=== provideGlance 被调用了 ===")
         // 暂时使用假数据，确保能编译通过
         val monthCount = 8
         val dateStr = "10月25日"
