@@ -133,6 +133,7 @@ fun RecordSheet(
     var mood by remember { mutableStateOf(initial?.mood ?: "😋") }
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var photoName by remember { mutableStateOf(initial?.photoPath) }
+    var previewBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember {
         mutableStateOf(initial?.timestamp ?: System.currentTimeMillis())
