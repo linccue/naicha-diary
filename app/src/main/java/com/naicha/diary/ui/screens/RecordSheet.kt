@@ -1,30 +1,18 @@
 package com.naicha.diary.ui.screens
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,34 +21,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -68,33 +38,22 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.Dp
-import androidx.core.content.FileProvider
 import com.naicha.diary.data.AppSettings
 import com.naicha.diary.data.Brand
 import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.Drink
 import com.naicha.diary.data.DrinkCategory
 import com.naicha.diary.net.DeepSeekClient
-import com.naicha.diary.ui.components.BrandBadge
-import com.naicha.diary.ui.components.CupStyle
-import com.naicha.diary.ui.components.cupStyleFor
-import com.naicha.diary.ui.components.DrinkCup
-import com.naicha.diary.ui.components.GradientButton
-import com.naicha.diary.ui.components.LocalPhoto
-import com.naicha.diary.ui.components.RatingStars
-import com.naicha.diary.ui.components.TagChip
-import com.naicha.diary.ui.theme.Caramel
-import com.naicha.diary.ui.theme.Matcha
-import com.naicha.diary.ui.theme.Outline
-import com.naicha.diary.ui.theme.PearlSoft
-import com.naicha.diary.ui.theme.Strawberry
-import com.naicha.diary.ui.theme.Taro
+import com.naicha.diary.ui.components.*
+import com.naicha.diary.ui.theme.*
+import com.naicha.diary.util.ImageSegmenter
 import com.naicha.diary.util.PhotoStore
+import com.naicha.diary.util.U2NetSegmenter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -121,19 +80,23 @@ fun RecordSheet(
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var cupSize by remember { mutableStateOf(initial?.cupSize ?: "中杯") }
     var sugar by remember { mutableStateOf(initial?.sugar ?: "七分糖") }
-        var ice by remember { mutableStateOf(initial?.ice ?: "") } // 留空，不默认选择
+    var ice by remember { mutableStateOf(initial?.ice ?: "") } // 默认留空
     var toppings by remember { mutableStateOf(initial?.toppings ?: emptyList()) }
     var priceText by remember {
         mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "")
     }
-     var rating by remember { mutableIntStateOf(initial?.rating ?: 0) } // 0 表示未评分
-        var mood by remember { mutableStateOf(initial?.mood ?: "") } // 留空，不默认选择
+    var rating by remember { mutableIntStateOf(initial?.rating ?: 0) } // 默认0分
+    var mood by remember { mutableStateOf(initial?.mood ?: "") } // 默认留空
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var photoName by remember { mutableStateOf(initial?.photoPath) }
+    
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember {
         mutableStateOf(initial?.timestamp ?: System.currentTimeMillis())
     }
+
+    var isSegmenting by remember { mutableStateOf(false) }
+    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var aiLoading by remember { mutableStateOf(false) }
     var aiMessage by remember { mutableStateOf<String?>(null) }
 
@@ -147,13 +110,10 @@ fun RecordSheet(
         if (brand.isNotBlank() && Catalog.brandOf(brand).category != next) brand = ""
         val sizes = Catalog.sizesFor(next)
         if (cupSize !in sizes) cupSize = sizes.getOrElse(1) { sizes.first() }
-               val sugars = Catalog.sugarOptions(next)
-        // 如果当前选的不在新列表里，且不是空，回退到七分糖；如果是空就保持空
+        val sugars = Catalog.sugarOptions(next)
         if (sugar !in sugars && sugar.isNotBlank()) sugar = "七分糖"
-        
         val ices = Catalog.iceOptions(next)
-        // 如果当前选的不在新列表里，直接清空，让用户自己选
-        if (ice !in ices && ice.isNotBlank()) ice = "" 
+        if (ice !in ices && ice.isNotBlank()) ice = ""
         val extras = Catalog.extraOptions(next)
         toppings = toppings.filter { it in extras }
     }
@@ -202,9 +162,53 @@ fun RecordSheet(
 
     LaunchedEffect(photoImage) {
         if (photoImage != null) {
-            val saved = withContext(Dispatchers.IO) { PhotoStore.save(context, photoImage) }
-            if (saved != null) photoName = saved
-            onPhotoImageConsumed()
+            isSegmenting = true
+            try {
+                var bitmap: Bitmap? = null
+                try {
+                    val options = BitmapFactory.Options()
+                    options.inMutable = true
+                    context.contentResolver.openInputStream(photoImage)?.use { input ->
+                        bitmap = BitmapFactory.decodeStream(input, null, options)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                if (bitmap != null) {
+                    previewBitmap = bitmap
+                    
+                    val savedFile = File(context.filesDir, "photo_${System.currentTimeMillis()}.jpg")
+                    FileOutputStream(savedFile).use { bitmap!!.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                    photoName = savedFile.name
+
+                    withContext(Dispatchers.IO) {
+                        try {
+                            U2NetSegmenter.init(context)
+                            val result = U2NetSegmenter.removeBackground(bitmap!!)
+                            if (result != null) {
+                                withContext(Dispatchers.Main) { previewBitmap = result }
+                                val newFile = File(context.filesDir, "seg_${savedFile.nameWithoutExtension}.png")
+                                FileOutputStream(newFile).use { result.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                                photoName = newFile.name
+                            } else {
+                                withContext(Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, "抠图未识别到主体，保留原图", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                } else {
+                    android.util.Log.e("PhotoDebug", "bitmap 读取为空")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isSegmenting = false
+                onPhotoImageConsumed()
+            }
         }
     }
 
@@ -454,7 +458,9 @@ fun RecordSheet(
                                             color = if (mood == emoji) brandColor else Color.Transparent,
                                             shape = CircleShape,
                                         )
-                                        .clickable { mood = emoji },
+                                        .clickable { 
+                                            mood = if (mood == emoji) "" else emoji 
+                                        },
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(text = emoji, fontSize = 22.sp)
@@ -467,10 +473,39 @@ fun RecordSheet(
                 item {
                     FieldGroup(title = "照片", subtitle = "可选") {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            val preview = photoName
-                            if (preview != null) {
+                            if (isSegmenting) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(84.dp)
+                                        .clip(MaterialTheme.shapes.medium)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp,
+                                        color = brandColor
+                                    )
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    text = "AI 抠图中…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = brandColor
+                                )
+                            } else if (previewBitmap != null) {
+                                Image(
+                                    bitmap = previewBitmap!!.asImageBitmap(),
+                                    contentDescription = "抠图预览",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(84.dp)
+                                        .clip(MaterialTheme.shapes.medium)
+                                )
+                                Spacer(Modifier.width(12.dp))
+                            } else if (photoName != null) {
                                 LocalPhoto(
-                                    file = PhotoStore.fileOf(preview),
+                                    file = PhotoStore.fileOf(photoName!!),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .size(84.dp)
@@ -478,14 +513,18 @@ fun RecordSheet(
                                 )
                                 Spacer(Modifier.width(12.dp))
                             }
-                            PhotoButton(text = "相册", emoji = "🖼") { onPick(false, false) }
-                            Spacer(Modifier.width(10.dp))
-                            PhotoButton(text = "拍照", emoji = "📷") { onPick(false, true) }
-                            if (preview != null) {
+
+                            if (!isSegmenting) {
+                                PhotoButton(text = "相册", emoji = "🖼") { onPick(false, false) }
                                 Spacer(Modifier.width(10.dp))
-                                PhotoButton(text = "移除", emoji = "✕") {
-                                    PhotoStore.delete(preview)
-                                    photoName = null
+                                PhotoButton(text = "拍照", emoji = "📷") { onPick(false, true) }
+                                if (photoName != null) {
+                                    Spacer(Modifier.width(10.dp))
+                                    PhotoButton(text = "移除", emoji = "✕") {
+                                        PhotoStore.delete(photoName!!)
+                                        photoName = null
+                                        previewBitmap = null
+                                    }
                                 }
                             }
                         }
@@ -505,6 +544,7 @@ fun RecordSheet(
                         )
                     }
                 }
+                
                 item {
                     FieldGroup(title = "日期") {
                         Row(
@@ -529,7 +569,8 @@ fun RecordSheet(
                             )
                         }
                     }
-                }                
+                }
+
                 item { Spacer(Modifier.height(4.dp)) }
             }
 
@@ -591,7 +632,8 @@ fun RecordSheet(
             }
         }
     }
-        if (showDatePicker) {
+
+    if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = timestampToDatePickerMillis(selectedDate)
         )
@@ -793,11 +835,13 @@ private fun PreviewRow(
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                       if (rating > 0) {
+                    if (rating > 0) {
                         RatingStars(rating = rating, starSize = 14.dp)
                     }
-                    Spacer(Modifier.width(8.dp))
-                      if (mood.isNotBlank()) {
+                    if (rating > 0 && mood.isNotBlank()) {
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    if (mood.isNotBlank()) {
                         Text(text = mood, fontSize = 16.sp)
                     }
                 }
@@ -932,6 +976,7 @@ private fun softLiquid(color: Color): Color = Color(
     blue = color.blue * 0.62f + 0.38f,
     alpha = 1f,
 )
+
 private fun timestampToDatePickerMillis(timestamp: Long): Long =
     java.time.Instant.ofEpochMilli(timestamp)
         .atZone(java.time.ZoneId.systemDefault())
