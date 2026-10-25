@@ -1,5 +1,6 @@
 package com.naicha.diary.ui.screens
 
+import androidx.compose.ui.graphics.asImageBitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import com.naicha.diary.util.U2NetSegmenter
