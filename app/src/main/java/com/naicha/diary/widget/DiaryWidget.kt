@@ -9,6 +9,7 @@ import com.naicha.diary.R
 // 注意这里改成了 AppWidgetProvider
 class DiaryWidget : AppWidgetProvider() {
     override fun onUpdate(
+        android.util.Log.d("WidgetDebug", "onUpdate called")
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
