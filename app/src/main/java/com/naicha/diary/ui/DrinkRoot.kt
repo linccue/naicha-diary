@@ -141,6 +141,7 @@ fun DrinkRoot() {
         val target = pendingCameraUri
         pendingCameraUri = null
         if (success) {
+             if (pickForAi) aiImage = target else photoImage = target
             if (openSheetAfterPick) {
                 editing = null
                 showRecord = true
