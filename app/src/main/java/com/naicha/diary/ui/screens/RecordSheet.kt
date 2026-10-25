@@ -204,43 +204,54 @@ fun RecordSheet(
 
         var isSegmenting by remember { mutableStateOf(false) }
 
-    LaunchedEffect(photoImage) {
+        LaunchedEffect(photoImage) {
         if (photoImage != null) {
-            // 1. 先保存用户拍的原始照片（作为兜底）
-            val saved = withContext(Dispatchers.IO) { PhotoStore.save(context, photoImage) }
-            if (saved != null) {
-                photoName = saved
-                isSegmenting = true
-                
-                // 2. 切换后台线程，开始自动抠图
-                withContext(Dispatchers.IO) {
-                    try {
-                        val file = PhotoStore.fileOf(saved)
-                        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                        
-                        if (bitmap != null) {
-                            // 召唤本地 ML Kit 抠图
-                            val result = ImageSegmenter.removeBackground(context, bitmap)
+            isSegmenting = true
+            try {
+                // 1. 尝试保存原图
+                val saved = withContext(Dispatchers.IO) { PhotoStore.save(context, photoImage) }
+                if (saved != null) {
+                    photoName = saved
+                    
+                    // 2. 开始抠图
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val file = PhotoStore.fileOf(saved)
+                            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
                             
-                            if (result != null) {
-                                // 3. 把抠好的透明图存进手机
-                                val newFile = File(file.parentFile, "seg_${file.nameWithoutExtension}.png")
-                                val out = FileOutputStream(newFile)
-                                result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                                out.close()
-                                
-                                // 4. 更新界面状态，让界面无缝切换成透明图
-                                photoName = newFile.name
+                            if (bitmap != null) {
+                                val result = ImageSegmenter.removeBackground(context, bitmap)
+                                if (result != null) {
+                                    // 3. 保存透明图
+                                    val newFile = File(file.parentFile, "seg_${file.nameWithoutExtension}.png")
+                                    val out = FileOutputStream(newFile)
+                                    result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                                    out.close()
+                                    photoName = newFile.name
+                                } else {
+                                    // 抠图失败，提示用户
+                                    withContext(Dispatchers.Main) {
+                                        android.widget.Toast.makeText(context, "AI 抠图失败，保留原图", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    } finally {
-                        isSegmenting = false // 无论成功失败，转圈结束
+                    }
+                } else {
+                    // 保存原图失败
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "读取图片失败，请重试", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                // 无论成功失败，必须结束转圈，否则界面卡死
+                isSegmenting = false
+                onPhotoImageConsumed()
             }
-            onPhotoImageConsumed()
         }
     }
 
