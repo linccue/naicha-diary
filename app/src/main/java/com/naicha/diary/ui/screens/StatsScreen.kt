@@ -154,8 +154,6 @@ fun StatsScreen(
             }
 
             if (total > 0) {
-                item { AiInsightCard(items = items) }
-
                 item {
                     SoftCard {
                         SectionHeader(title = "品牌分布", subtitle = "喝得最多的那几家")
@@ -202,126 +200,6 @@ fun StatsScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun AiInsightCard(items: List<Drink>) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var result by remember { mutableStateOf<String?>(null) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    SoftCard(
-        color = Color(0xFFF3F0FF),
-        shadowColor = Taro,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(listOf(Color(0xFF6C5CE7), Color(0xFFB79CED)))
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(text = "🤖", fontSize = 18.sp)
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "AI 洞察",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "让 AI 说说你的饮品习惯",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        when {
-            loading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = Taro,
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = "AI 正在翻阅你的记录…",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = PearlSoft,
-                )
-            }
-
-            result != null -> Text(
-                text = result!!,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color(0xFF4B3B8F),
-            )
-
-            else -> {
-                Text(
-                    text = error ?: "点一下，AI 会读你所有的记录，给你一句总结",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (error != null) Strawberry else PearlSoft,
-                )
-                Spacer(Modifier.height(12.dp))
-                GradientButton(
-                    text = "让 AI 分析一下",
-                    onClick = {
-                        val key = AppSettings.apiKey
-                        if (key.isBlank()) {
-                            error = "先去「我的」填 DeepSeek API Key"
-                            return@GradientButton
-                        }
-                        loading = true
-                        error = null
-                        scope.launch {
-                            DeepSeekClient.insight(key, buildSummary(items))
-                                .onSuccess { result = it }
-                                .onFailure { error = it.message ?: "分析失败" }
-                            loading = false
-                        }
-                    },
-                    colors = listOf(Color(0xFF6C5CE7), Color(0xFFB79CED)),
-                )
-            }
-        }
-    }
-}
-
-private fun buildSummary(items: List<Drink>): String {
-    val total = items.size
-    val topBrand = items.groupingBy { it.brand }.eachCount().maxByOrNull { it.value }
-    val topSugar = items.groupingBy { it.sugar }.eachCount().maxByOrNull { it.value }
-    val topCategory = items.groupingBy { it.category }.eachCount().maxByOrNull { it.value }
-    val avgRating = if (total == 0) 0f else items.sumOf { it.rating }.toFloat() / total
-    val spend = items.sumOf { it.price }
-    val today = TimeUtil.startOfDay(System.currentTimeMillis())
-    val last7 = items.count { it.timestamp >= today - 6 * 86_400_000L }
-    val last30 = items.count { it.timestamp >= today - 29 * 86_400_000L }
-    val calories = items.sumOf { it.calories }
-
-    return buildString {
-        append("用户最近的饮品记录统计：")
-        append("总计 $total 次；")
-        topCategory?.let { append("最常喝品类是 ${it.key}（${it.value} 次）；") }
-        topBrand?.let { append("最常喝品牌是 ${it.key}（${it.value} 次）；") }
-        topSugar?.let { append("最常选 ${it.key}；") }
-        append("平均评分 ${String.format("%.1f", avgRating)}；")
-        append("累计花费约 ${spend.toInt()} 元；")
-        append("累计热量约 ${calories} 千卡；")
-        append("最近 7 天 $last7 次，最近 30 天 $last30 次。")
-        val brands = items.map { it.brand }.distinct().size
-        append("一共尝试过 $brands 个品牌。")
     }
 }
 
