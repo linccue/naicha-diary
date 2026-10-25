@@ -250,10 +250,10 @@ fun RecordSheet(
                             e.printStackTrace()
                         }
                     }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(context, "无法解析照片", android.widget.Toast.LENGTH_SHORT).show()
-                    }
+                               } else {
+                    // 移除报错弹窗，防止相机文件写入延迟引起的误报
+                    android.util.Log.e("PhotoDebug", "bitmap 读取为空")
+                }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
