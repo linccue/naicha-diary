@@ -95,6 +95,7 @@ object Catalog {
     val brands: List<Brand> = listOf(
         // ── 茶饮（按 2026 门店规模 / 影响力排序）───────────────
         Brand("蜜雪冰城", tea, 0xFFE23A2E, "雪", R.drawable.logo_mixue),
+        Brand("陈文鼎", tea, 0xFF8B4A2B, "鼎", R.drawable.logo_chenwending),
         Brand("古茗", tea, 0xFF2B2B2B, "古", R.drawable.logo_guming),
         Brand("沪上阿姨", tea, 0xFFC7303E, "沪", R.drawable.logo_hushangayi),
         Brand("茶百道", tea, 0xFF2E86DE, "茶", R.drawable.logo_chabaidao),
