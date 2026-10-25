@@ -80,13 +80,13 @@ fun RecordSheet(
     var brand by remember { mutableStateOf(initial?.brand ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var cupSize by remember { mutableStateOf(initial?.cupSize ?: "中杯") }
-    var sugar by remember { mutableStateOf(initial?.sugar ?: "七分糖") }
-    var ice by remember { mutableStateOf(initial?.ice ?: "") } // 默认留空
+        var sugar by remember { mutableStateOf(initial?.sugar ?: "七分糖") }
+        var ice by remember { mutableStateOf(initial?.ice ?: "") } // 留空，不默认选择
     var toppings by remember { mutableStateOf(initial?.toppings ?: emptyList()) }
     var priceText by remember {
         mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "")
     }
-    var rating by remember { mutableIntStateOf(initial?.rating ?: 0) } // 默认0分
+var rating by remember { mutableIntStateOf(initial?.rating ?: 0) } // 0 表示未评分
     var mood by remember { mutableStateOf(initial?.mood ?: "") } // 默认留空
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var photoName by remember { mutableStateOf(initial?.photoPath) }
@@ -111,10 +111,13 @@ fun RecordSheet(
         if (brand.isNotBlank() && Catalog.brandOf(brand).category != next) brand = ""
         val sizes = Catalog.sizesFor(next)
         if (cupSize !in sizes) cupSize = sizes.getOrElse(1) { sizes.first() }
-        val sugars = Catalog.sugarOptions(next)
+                val sugars = Catalog.sugarOptions(next)
+        // 如果当前选的不在新列表里，且不是空，回退到七分糖；如果是空就保持空
         if (sugar !in sugars && sugar.isNotBlank()) sugar = "七分糖"
+        
         val ices = Catalog.iceOptions(next)
-        if (ice !in ices && ice.isNotBlank()) ice = ""
+        // 如果当前选的不在新列表里，直接清空，让用户自己选
+        if (ice !in ices && ice.isNotBlank()) ice = "" 
         val extras = Catalog.extraOptions(next)
         toppings = toppings.filter { it in extras }
     }
