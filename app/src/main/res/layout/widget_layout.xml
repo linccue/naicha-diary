@@ -6,6 +6,8 @@
     android:background="@drawable/widget_bg"
     android:gravity="center_vertical"
     android:orientation="horizontal"
+        android:clickable="true"
+    android:focusable="true"
     android:paddingStart="16dp"
     android:paddingEnd="16dp"
     android:paddingTop="0dp"
