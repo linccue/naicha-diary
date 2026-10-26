@@ -53,23 +53,24 @@ class DiaryWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.tv_date, dateText)
             views.setTextViewText(R.id.tv_drink_name, nameText)
 
-            // 👇 全新强化版跳转逻辑 👇
-            // 获取 App 的启动页
+            // 获取启动意图
             val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-                // 清除旧页面，直接回主页
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                // 增加 SINGLE_TOP，防止 App 重复开启多个页面
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             
             if (launchIntent != null) {
-                // 注意：requestCode 使用 appWidgetId，确保每个组件都有独立的 Intent
                 val pendingIntent = PendingIntent.getActivity(
                     context,
-                    appWidgetId, 
+                    appWidgetId, // 必须带 ID 区分不同组件
                     launchIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                // 把点击事件绑在整个根布局上
+                // 关键点：把点击事件同时绑定到 根布局 和 里面的每一个元素
                 views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
+                views.setOnClickPendingIntent(R.id.tv_month_count, pendingIntent)
+                views.setOnClickPendingIntent(R.id.tv_drink_name, pendingIntent)
+                views.setOnClickPendingIntent(R.id.tv_date, pendingIntent)
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
