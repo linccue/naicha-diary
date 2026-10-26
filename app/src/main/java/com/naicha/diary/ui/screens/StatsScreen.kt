@@ -1,10 +1,8 @@
 package com.naicha.diary.ui.screens
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.border
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -60,70 +59,21 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                   @Composable
-fun StatPill(
-    label: String,
-    value: String,
-    accent: Color,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            // 1. 大圆角 + 带微主题色的柔和阴影（让卡片浮起来，且不显脏）
-            .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(18.dp),
-                ambientColor = accent.copy(alpha = 0.25f),
-                spotColor = accent.copy(alpha = 0.25f)
-            )
-            .clip(RoundedCornerShape(18.dp))
-            // 2. 极其轻微的白色到主题浅色的渐变底，比纯白更有质感
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White,
-                        accent.copy(alpha = 0.06f)
-                    )
-                )
-            )
-            // 3. 加一圈极细的主题色边框，强化轮廓
-            .border(0.8.dp, accent.copy(alpha = 0.15f), RoundedCornerShape(18.dp))
-            .padding(horizontal = 10.dp, vertical = 14.dp)
-    ) {
-        // 顶部：小圆点 + 标签
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(accent)
-            )
-            Spacer(Modifier.width(5.dp))
-            Text(
-                text = label,
-                color = Color(0xFF888888), // 统一的灰色标签
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1
-            )
-        }
-        
-        Spacer(Modifier.height(10.dp))
-        
-        // 底部：超大、超粗的深色数字，极其显眼
-        Text(
-            text = value,
-            color = Color(0xFF1E1E1E),
-            fontSize = 22.sp, 
-            fontWeight = FontWeight.Black, 
-            maxLines = 1
-        )
-    }
-}
+                    StatPill(label = "总杯数", value = total.toString(), accent = Caramel, modifier = Modifier.weight(1f))
+                    StatPill(label = "总花费", value = "¥${formatMoney(totalSpend)}", accent = Taro, modifier = Modifier.weight(1f))
+                    StatPill(label = "连续天数", value = "$streak 天", accent = Matcha, modifier = Modifier.weight(1f))
+                }
+            }
+
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatPill(label = "平均单价", value = "¥${formatMoney(avgPrice)}", accent = Sky, modifier = Modifier.weight(1f))
+                    StatPill(label = "平均评分", value = String.format("%.1f", avgRating), accent = Strawberry, modifier = Modifier.weight(1f))
+                    StatPill(label = "总热量", value = "${totalCalories}", accent = Color(0xFFE07A5F), modifier = Modifier.weight(1f))
+                }
             }
 
             if (total > 0) {
-                // 1. 品牌分布
                 item {
                     SoftCard {
                         SectionHeader(title = "品牌分布", subtitle = "喝得最多的那几家")
@@ -132,7 +82,6 @@ fun StatPill(
                     }
                 }
 
-                // 2. 甜度偏好
                 item {
                     SoftCard {
                         SectionHeader(title = "甜度偏好", subtitle = "你的甜度人格")
@@ -144,7 +93,6 @@ fun StatPill(
                     }
                 }
 
-                // 3. 本月日历
                 item {
                     SoftCard {
                         SectionHeader(title = "本月日历", subtitle = "每天喝了几杯")
@@ -153,22 +101,18 @@ fun StatPill(
                     }
                 }
 
-                // 4. 周节律
                 item {
                     WeekRhythmCard(items)
                 }
 
-                // 5. 距离上次与平均天数
                 item {
                     IntervalCards(items)
                 }
 
-                // 6. 消费总额排行
                 item {
                     SpendingRankCard(items)
                 }
 
-                // 7. 成就勋章（确保在所有卡片的最下方）
                 item {
                     SoftCard {
                         SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
@@ -181,8 +125,42 @@ fun StatPill(
     }
 }
 
-// ================= 各模块组件逻辑 =================
+// ================= 高级质感数据卡片 =================
+@Composable
+fun StatPill(
+    label: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(18.dp),
+                ambientColor = accent.copy(alpha = 0.25f),
+                spotColor = accent.copy(alpha = 0.25f)
+            )
+            .clip(RoundedCornerShape(18.dp))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color.White, accent.copy(alpha = 0.06f))
+                )
+            )
+            .border(0.8.dp, accent.copy(alpha = 0.15f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 10.dp, vertical = 14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accent))
+            Spacer(Modifier.width(5.dp))
+            Text(text = label, color = Color(0xFF888888), fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(text = value, color = Color(0xFF1E1E1E), fontSize = 22.sp, fontWeight = FontWeight.Black, maxLines = 1)
+    }
+}
 
+// ================= 各模块组件逻辑 =================
 @Composable
 private fun WeekRhythmCard(items: List<Drink>) {
     val weekData = remember(items) {
@@ -359,26 +337,10 @@ private fun SpendingRankCard(items: List<Drink>) {
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "${index + 1}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (index == 0) Color.Black else Color.LightGray,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(24.dp)
-                )
+                Text(text = "${index + 1}", style = MaterialTheme.typography.titleMedium, color = if (index == 0) Color.Black else Color.LightGray, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    text = brandName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Black,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "¥${formatMoney(amount)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.Black
-                )
+                Text(text = brandName, style = MaterialTheme.typography.bodyLarge, color = Color.Black, modifier = Modifier.weight(1f))
+                Text(text = "¥${formatMoney(amount)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, color = Color.Black)
             }
         }
     }
