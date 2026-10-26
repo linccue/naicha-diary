@@ -138,8 +138,9 @@ fun SettingsContent(
                 }
             }
         }
-AbstinenceTracker(modifier = Modifier.padding(horizontal = 20.dp))
-Spacer(modifier = Modifier.height(16.dp))
+        item {
+            AbstinenceTracker(modifier = Modifier.fillMaxWidth())
+        }
         item {
             SoftCard {
                 SectionHeader(title = "AI 识图录入", subtitle = "拍小票自动填表")
