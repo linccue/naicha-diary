@@ -5,13 +5,13 @@ import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.Base64
 
 object WebDavClient {
 
     private fun getBase64Auth(user: String, pass: String): String {
         val auth = "$user:$pass"
-        return "Basic " + Base64.encodeToString(auth.toByteArray(), Base64.NO_WRAP)
+        // 使用 Android 原生的 Base64，完美兼容所有机型
+        return "Basic " + android.util.Base64.encodeToString(auth.toByteArray(), android.util.Base64.NO_WRAP)
     }
 
     // 上传文件
