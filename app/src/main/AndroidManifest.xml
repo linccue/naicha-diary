@@ -19,7 +19,17 @@
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.Drink">
-
+        <receiver
+            android:label="不喝打卡进度"
+            android:name="com.naicha.diary.widget.AbstinenceWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/abstinence_widget_info" />
+        </receiver>
            <receiver
             android:label="饮品日记 - 横幅"
             android:name="com.naicha.diary.widget.DiaryWidget"
