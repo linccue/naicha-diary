@@ -5,11 +5,15 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,31 +24,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun AbstinenceTracker(modifier: Modifier = Modifier) {
+fun AbstinenceTracker(
+    modifier: Modifier = Modifier,
+    onOpenSettings: () -> Unit = {} // 新增：打开设置的点击事件
+) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("abstinence_prefs", android.content.Context.MODE_PRIVATE) }
 
-    // 读取状态
     var isTracking by remember { mutableStateOf(prefs.getBoolean("is_tracking", false)) }
     var targetDays by remember { mutableIntStateOf(prefs.getInt("target_days", 7)) }
     var startDate by remember { mutableLongStateOf(prefs.getLong("start_date", 0L)) }
     var drankDaysStr by remember { mutableStateOf(prefs.getString("drank_days", "") ?: "") }
     
-    // 当前的选项目标（准备阶段）
     var selectedGoal by remember { mutableIntStateOf(7) }
-    
-    // 是否今天喝了
+    var showEndDialog by remember { mutableStateOf(false) } // 结束弹窗控制
+
     val drankDays = remember(drankDaysStr) {
         if (drankDaysStr.isEmpty()) emptySet() else drankDaysStr.split(",").map { it.toInt() }.toSet()
     }
 
-    // 计算当前是第几天 (0开始)
     val todayDiff = remember(startDate) {
         if (startDate == 0L) 0
         else {
@@ -56,20 +61,31 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
 
     val isTodayDrank = drankDays.contains(todayDiff)
 
-    Column(modifier = modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        // 标题
-        Text(
-            text = "不喝打卡",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
+    Column(modifier = modifier.fillMaxWidth()) {
+        // 标题和齿轮按钮
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "不喝打卡",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f)
+            )
+            // 只有在第一层页面才显示齿轮按钮
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "设置",
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
 
         if (!isTracking) {
-            // ============ 准备阶段 (图一) ============
-            
-            // 深色卡片
+            // ============ 准备阶段 ============
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -107,7 +123,6 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
 
             Spacer(Modifier.height(16.dp))
 
-            // 白色卡片
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -119,19 +134,12 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
                     Text("选择目标", color = Color.Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(12.dp))
                     val goals = listOf(3, 7, 15, 21, 30)
-                    // 用 FlowRow 效果展示按钮 (按两排)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        goals.take(3).forEach { goal ->
-                            GoalChip(
-                                text = if (goal < 7) "${goal} 天" else if (goal == 7) "1 周" else "${goal} 天",
-                                selected = selectedGoal == goal,
-                                onClick = { selectedGoal = goal }
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        goals.drop(3).forEach { goal ->
+                    // 允许横向滑动，保证所有选项在一行
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        goals.forEach { goal ->
                             GoalChip(
                                 text = if (goal == 30) "1 个月" else "${goal} 天",
                                 selected = selectedGoal == goal,
@@ -143,9 +151,7 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
             }
 
         } else {
-            // ============ 进行中阶段 (图二/三/四) ============
-            
-            // 深色卡片 (进度)
+            // ============ 进行中阶段 ============
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -166,10 +172,7 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
                             modifier = Modifier
                                 .clip(CircleShape)
                                 .background(Color.White)
-                                .clickable {
-                                    isTracking = false
-                                    prefs.edit().putBoolean("is_tracking", false).apply()
-                                }
+                                .clickable { showEndDialog = true } // 点击显示弹窗
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Text("结束", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -178,7 +181,6 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
                     
                     Spacer(Modifier.height(16.dp))
                     
-                    // 进度条
                     val progress = (todayDiff.toFloat() / targetDays).coerceIn(0f, 1f)
                     val animatedProgress by animateFloatAsState(targetValue = progress, label = "progress")
                     
@@ -209,7 +211,6 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
 
             Spacer(Modifier.height(16.dp))
 
-            // 白色卡片 (本轮进度圆圈)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -221,7 +222,6 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
                     Text("本轮进度", color = Color.Gray, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(16.dp))
                     
-                    // 渲染圆圈矩阵 (每排 7 个)
                     val circles = (0 until targetDays).chunked(7)
                     circles.forEach { rowList ->
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 10.dp)) {
@@ -229,7 +229,7 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
                                 val circleColor = when {
                                     drankDays.contains(dayIndex) -> Color(0xFFF2A54A) // 橙
                                     dayIndex <= todayDiff -> Color(0xFF52D17C) // 绿
-                                    else -> Color(0xFFF2F2F2) // 白/灰
+                                    else -> Color(0xFFF2F2F2) // 灰
                                 }
                                 Box(
                                     modifier = Modifier
@@ -242,7 +242,6 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
                     }
                     
                     Spacer(Modifier.height(8.dp))
-                    // 图例
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         LegendItem("不喝", Color(0xFF52D17C))
                         LegendItem("喝了", Color(0xFFF2A54A))
@@ -253,19 +252,18 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
 
             Spacer(Modifier.height(16.dp))
 
-            // 统计数据
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 val validStreak = if (isTodayDrank) 0 else todayDiff - drankDays.count { it < todayDiff }
                 StatBox("已连续", "${validStreak} 天", Modifier.weight(1f))
                 StatBox("累计不喝", "${(todayDiff + 1) - drankDays.size} 天", Modifier.weight(1f))
                 
-                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(startDate))
-                StatBox("开始于", dateStr, Modifier.weight(1.2f))
+                // 去掉了年份，格式变为 MM-dd
+                val dateStr = SimpleDateFormat("MM-dd", Locale.CHINA).format(Date(startDate))
+                StatBox("开始于", dateStr, Modifier.weight(1f))
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // 底部打卡按钮
             val btnBgColor by animateColorAsState(if (isTodayDrank) Color.Black else Color.White, label = "btnBg")
             val btnTextColor by animateColorAsState(if (isTodayDrank) Color.White else Color.Black, label = "btnText")
             
@@ -276,11 +274,7 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
                     .background(btnBgColor)
                     .border(1.dp, if (isTodayDrank) Color.Transparent else Color.LightGray, CircleShape)
                     .clickable {
-                        val newDrankDays = if (isTodayDrank) {
-                            drankDays - todayDiff
-                        } else {
-                            drankDays + todayDiff
-                        }
+                        val newDrankDays = if (isTodayDrank) drankDays - todayDiff else drankDays + todayDiff
                         drankDaysStr = newDrankDays.joinToString(",")
                         prefs.edit().putString("drank_days", drankDaysStr).apply()
                     }
@@ -293,6 +287,63 @@ fun AbstinenceTracker(modifier: Modifier = Modifier) {
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+        }
+    }
+
+    // 结束确认弹窗
+    if (showEndDialog) {
+        Dialog(onDismissRequest = { showEndDialog = false }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.White)
+                    .padding(24.dp)
+            ) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("结束本轮？", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.weight(1f))
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "关闭",
+                            modifier = Modifier.size(24.dp).clickable { showEndDialog = false }
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text("结束后当前进度会清空。", fontSize = 14.sp, color = Color.Gray)
+                    Spacer(Modifier.height(24.dp))
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(CircleShape)
+                                .border(1.dp, Color(0xFFE0E0E0), CircleShape)
+                                .background(Color.White)
+                                .clickable { showEndDialog = false }
+                                .padding(vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("取消", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(CircleShape)
+                                .background(Color.Black)
+                                .clickable {
+                                    isTracking = false
+                                    prefs.edit().putBoolean("is_tracking", false).apply()
+                                    showEndDialog = false
+                                }
+                                .padding(vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("结束", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
     }
@@ -312,7 +363,8 @@ private fun GoalChip(text: String, selected: Boolean, onClick: () -> Unit) {
             text = text,
             color = if (selected) Color.White else Color.DarkGray,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            fontSize = 14.sp
+            fontSize = 14.sp,
+            maxLines = 1
         )
     }
 }
@@ -332,10 +384,10 @@ private fun StatBox(title: String, value: String, modifier: Modifier = Modifier)
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .background(Color.White)
-            .padding(16.dp)
+            .padding(horizontal = 12.dp, vertical = 16.dp)
     ) {
         Text(text = title, color = Color.Gray, fontSize = 12.sp)
         Spacer(Modifier.height(4.dp))
-        Text(text = value, color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text(text = value, color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
