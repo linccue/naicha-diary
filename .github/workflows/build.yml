@@ -25,6 +25,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
       - name: Generate Gradle wrapper
         run: gradle wrapper
@@ -32,13 +34,13 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
-         - name: Rename APK with Version
-     run: |
-       cd app/build/outputs/apk/debug/
-       mv app-debug.apk naicha-diary-v1.0.${{ github.run_number }}.apk
+      - name: Rename APK with Version
+        run: |
+          cd app/build/outputs/apk/debug/
+          mv app-debug.apk naicha-diary-v1.0.${{ github.run_number }}.apk
 
-   - name: Upload APK
-     uses: actions/upload-artifact@v4
-     with:
-       name: naicha-diary-v1.0.${{ github.run_number }}
-       path: app/build/outputs/apk/debug/*.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: naicha-diary-v1.0.${{ github.run_number }}
+          path: app/build/outputs/apk/debug/*.apk
