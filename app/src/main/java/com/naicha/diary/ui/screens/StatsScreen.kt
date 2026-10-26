@@ -72,6 +72,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
             }
 
             if (total > 0) {
+                // 1. 品牌分布
                 item {
                     SoftCard {
                         SectionHeader(title = "品牌分布", subtitle = "喝得最多的那几家")
@@ -80,6 +81,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                     }
                 }
 
+                // 2. 甜度偏好
                 item {
                     SoftCard {
                         SectionHeader(title = "甜度偏好", subtitle = "你的甜度人格")
@@ -91,6 +93,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                     }
                 }
 
+                // 3. 本月日历
                 item {
                     SoftCard {
                         SectionHeader(title = "本月日历", subtitle = "每天喝了几杯")
@@ -99,21 +102,22 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                     }
                 }
 
-                // === 新增：周节律 ===
+                // 4. 周节律
                 item {
                     WeekRhythmCard(items)
                 }
 
-                // === 新增：距离上次与平均天数 ===
+                // 5. 距离上次与平均天数
                 item {
                     IntervalCards(items)
                 }
 
-                // === 新增：消费总额排行 ===
+                // 6. 消费总额排行
                 item {
                     SpendingRankCard(items)
                 }
 
+                // 7. 成就勋章（确保在所有卡片的最下方）
                 item {
                     SoftCard {
                         SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
@@ -126,17 +130,16 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     }
 }
 
-// ================= 新增的组件逻辑 =================
+// ================= 各模块组件逻辑 =================
 
 @Composable
 private fun WeekRhythmCard(items: List<Drink>) {
-    // 统计周一到周日的杯数
     val weekData = remember(items) {
-        val counts = IntArray(7) { 0 } // 0:一, 1:二 ... 6:日
+        val counts = IntArray(7) { 0 }
         items.forEach { drink ->
             val cal = Calendar.getInstance().apply { timeInMillis = drink.timestamp }
-            var day = cal.get(Calendar.DAY_OF_WEEK) - 2 // 0=Mon, 6=Sun
-            if (day < 0) day = 6 // 周日
+            var day = cal.get(Calendar.DAY_OF_WEEK) - 2
+            if (day < 0) day = 6
             counts[day]++
         }
         counts.toList()
@@ -148,7 +151,6 @@ private fun WeekRhythmCard(items: List<Drink>) {
         SectionHeader(title = "周节律", subtitle = "星期几最忍不住")
         Spacer(Modifier.height(24.dp))
         
-        // 用 Canvas 画平滑折线图
         Canvas(modifier = Modifier.fillMaxWidth().height(120.dp)) {
             val width = size.width
             val height = size.height
@@ -161,7 +163,6 @@ private fun WeekRhythmCard(items: List<Drink>) {
                 Offset(x, y)
             }
 
-            // 画平滑曲线路径
             val path = Path().apply {
                 moveTo(points[0].x, points[0].y)
                 for (i in 0 until points.size - 1) {
@@ -174,7 +175,6 @@ private fun WeekRhythmCard(items: List<Drink>) {
             
             drawPath(path = path, color = Color.Black, style = Stroke(width = 6f, cap = StrokeCap.Round))
             
-            // 画圆点
             points.forEach { point ->
                 drawCircle(color = Color(0xFFCCFF00), radius = 12f, center = point)
                 drawCircle(color = Color.Black, radius = 12f, center = point, style = Stroke(width = 4f))
@@ -207,7 +207,7 @@ private fun IntervalCards(items: List<Drink>) {
             val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
             c.get(Calendar.MONTH) == currentMonth && c.get(Calendar.YEAR) == currentYear
         }
-        val daysInMonth = cal.get(Calendar.DAY_OF_MONTH) // 本月过去的天数
+        val daysInMonth = cal.get(Calendar.DAY_OF_MONTH)
         if (monthItems.isEmpty()) return@remember "0"
         String.format("%.1f", daysInMonth.toFloat() / monthItems.size)
     }
@@ -225,8 +225,6 @@ private fun IntervalCards(items: List<Drink>) {
 @Composable
 private fun SpendingRankCard(items: List<Drink>) {
     var period by remember { mutableStateOf("月") }
-    
-    // 根据选择的时间段过滤数据
     val filteredItems = remember(items, period) {
         val now = Calendar.getInstance()
         val startTime = when (period) {
@@ -254,7 +252,6 @@ private fun SpendingRankCard(items: List<Drink>) {
     }
 
     val totalSpend = filteredItems.sumOf { it.price }
-    // 按品牌聚合消费金额，取前4名
     val brandSpending = remember(filteredItems) {
         filteredItems.groupBy { it.brand }
             .mapValues { entry -> entry.value.sumOf { it.price } }
@@ -267,7 +264,6 @@ private fun SpendingRankCard(items: List<Drink>) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SectionHeader(title = "消费总额排行", subtitle = null, modifier = Modifier.weight(1f))
             
-            // 周/月/年 切换按钮
             Row(
                 modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF4F5F7)).padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -294,7 +290,6 @@ private fun SpendingRankCard(items: List<Drink>) {
         
         Spacer(Modifier.height(16.dp))
         
-        // 总计支出
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE8E9EB)), contentAlignment = Alignment.Center) {
                 Text("$", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black)
@@ -308,7 +303,6 @@ private fun SpendingRankCard(items: List<Drink>) {
         
         Spacer(Modifier.height(20.dp))
         
-        // 排行列表
         brandSpending.forEachIndexed { index, (brandName, amount) ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -339,9 +333,8 @@ private fun SpendingRankCard(items: List<Drink>) {
     }
 }
 
-// ================= 原有的辅助组件 =================
-
-@Composable private fun BrandDonut(items: List<Drink>) {
+@Composable
+private fun BrandDonut(items: List<Drink>) {
     val data = remember(items) { items.groupingBy { it.brand }.eachCount().entries.sortedByDescending { it.value }.take(6) }
     val total = data.sumOf { it.value }.coerceAtLeast(1)
     val palette = listOf(Caramel, Taro, Matcha, Strawberry, Sky, Color(0xFFF2B04A))
@@ -376,7 +369,8 @@ private fun SpendingRankCard(items: List<Drink>) {
     }
 }
 
-@Composable private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>) {
+@Composable
+private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>) {
     val max = entries.maxOfOrNull { it.second }?.coerceAtLeast(1) ?: 1
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         entries.forEachIndexed { index, (label, count) ->
@@ -393,7 +387,8 @@ private fun SpendingRankCard(items: List<Drink>) {
     }
 }
 
-@Composable private fun MonthHeatmap(items: List<Drink>) {
+@Composable
+private fun MonthHeatmap(items: List<Drink>) {
     val calendar = remember { Calendar.getInstance() }
     val year = calendar.get(Calendar.YEAR)
     val month = calendar.get(Calendar.MONTH)
@@ -442,7 +437,8 @@ private fun SpendingRankCard(items: List<Drink>) {
     }
 }
 
-@Composable private fun Achievements(items: List<Drink>, streak: Int) {
+@Composable
+private fun Achievements(items: List<Drink>, streak: Int) {
     val brandCount = items.map { it.brand }.distinct().size
     val sugarCount = items.map { it.sugar }.distinct().size
     val photoCount = items.count { it.photoPath != null }
