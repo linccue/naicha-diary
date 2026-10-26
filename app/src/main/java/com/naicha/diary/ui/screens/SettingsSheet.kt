@@ -1,6 +1,7 @@
 package com.naicha.diary.ui.screens
 
 import androidx.compose.foundation.background
+import com.naicha.diary.ui.components.AbstinenceTracker
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -137,7 +138,8 @@ fun SettingsContent(
                 }
             }
         }
-
+AbstinenceTracker(modifier = Modifier.padding(horizontal = 20.dp))
+Spacer(modifier = Modifier.height(16.dp))
         item {
             SoftCard {
                 SectionHeader(title = "AI 识图录入", subtitle = "拍小票自动填表")
