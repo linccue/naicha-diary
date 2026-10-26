@@ -23,7 +23,6 @@ class AbstinenceWidget : AppWidgetProvider() {
         
         val drankDays = if (drankDaysStr.isEmpty()) emptySet() else drankDaysStr.split(",").map { it.toInt() }.toSet()
 
-        // 计算天数
         val todayDiff = if (startDate == 0L) 0 else {
             val cal1 = Calendar.getInstance().apply { timeInMillis = startDate; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }
             val cal2 = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }
@@ -33,32 +32,36 @@ class AbstinenceWidget : AppWidgetProvider() {
         val isTodayDrank = drankDays.contains(todayDiff)
         val validStreak = if (isTodayDrank) 0 else todayDiff - drankDays.count { it < todayDiff }
 
-        val views = RemoteViews(context.packageName, R.layout.widget_abstinence_layout)
-
-        if (!isTracking) {
-            views.setTextViewText(R.id.tv_abs_title, "不喝打卡")
-            views.setTextViewText(R.id.tv_abs_days, "未开始")
-            views.setTextViewText(R.id.tv_abs_status, "去 App 内设置目标")
-            views.setTextViewText(R.id.tv_abs_sub, "")
-        } else {
-            views.setTextViewText(R.id.tv_abs_title, if (isTodayDrank) "今日破戒" else "不喝打卡")
-            views.setTextViewText(R.id.tv_abs_days, "已连续 $validStreak 天")
-            views.setTextViewText(R.id.tv_abs_status, "进度 ${todayDiff + 1}/$targetDays")
-            views.setTextViewText(R.id.tv_abs_sub, "还差 ${targetDays - todayDiff - 1} 天")
-        }
-
-        // 设置点击跳转
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        launchIntent?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
-        
-        val pendingIntent = if (launchIntent != null) {
-            PendingIntent.getActivity(context, 0, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        } else null
-
         for (appWidgetId in appWidgetIds) {
-            if (pendingIntent != null) {
+            val views = RemoteViews(context.packageName, R.layout.widget_abstinence_layout)
+
+            if (!isTracking) {
+                views.setTextViewText(R.id.tv_abs_title, "不喝打卡")
+                views.setTextViewText(R.id.tv_abs_days, "未开始")
+                views.setTextViewText(R.id.tv_abs_status, "去 App 内设置目标")
+                views.setTextViewText(R.id.tv_abs_sub, "")
+            } else {
+                views.setTextViewText(R.id.tv_abs_title, if (isTodayDrank) "今日破戒" else "不喝打卡")
+                views.setTextViewText(R.id.tv_abs_days, "已连续 $validStreak 天")
+                views.setTextViewText(R.id.tv_abs_status, "进度 ${todayDiff + 1}/$targetDays")
+                views.setTextViewText(R.id.tv_abs_sub, "还差 ${targetDays - todayDiff - 1} 天")
+            }
+
+            // 👇 全新强化版跳转逻辑 👇
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+            }
+            
+            if (launchIntent != null) {
+                val pendingIntent = PendingIntent.getActivity(
+                    context,
+                    appWidgetId, 
+                    launchIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
                 views.setOnClickPendingIntent(R.id.widget_abs_root, pendingIntent)
             }
+
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
     }
