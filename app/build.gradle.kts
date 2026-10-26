@@ -16,8 +16,10 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 2
-        versionName = "1.1.0"
-        vectorDrawables.useSupportLibrary = true
+            // 自动读取 GitHub Actions 的运行序号，如果没有则默认是 1
+    val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+    versionCode = runNumber
+    versionName = "1.0.$runNumber"
     }
 
     androidResources {
