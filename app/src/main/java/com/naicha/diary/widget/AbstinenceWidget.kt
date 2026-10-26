@@ -47,9 +47,8 @@ class AbstinenceWidget : AppWidgetProvider() {
                 views.setTextViewText(R.id.tv_abs_sub, "还差 ${targetDays - todayDiff - 1} 天")
             }
 
-            // 👇 全新强化版跳转逻辑 👇
             val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             
             if (launchIntent != null) {
@@ -59,7 +58,12 @@ class AbstinenceWidget : AppWidgetProvider() {
                     launchIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
+                // 绑定到所有元素，不管点哪都能打开
                 views.setOnClickPendingIntent(R.id.widget_abs_root, pendingIntent)
+                views.setOnClickPendingIntent(R.id.tv_abs_title, pendingIntent)
+                views.setOnClickPendingIntent(R.id.tv_abs_days, pendingIntent)
+                views.setOnClickPendingIntent(R.id.tv_abs_status, pendingIntent)
+                views.setOnClickPendingIntent(R.id.tv_abs_sub, pendingIntent)
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
