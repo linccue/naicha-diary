@@ -331,7 +331,7 @@ private fun MonthHeatmap(items: List<Drink>) {
     val month = calendar.get(Calendar.MONTH)
     val today = calendar.get(Calendar.DAY_OF_MONTH)
 
-    // 把记录按日期分组
+    // 按天分组记录
     val dayRecords = remember(items, year, month) {
         items.filter {
             val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
@@ -346,11 +346,14 @@ private fun MonthHeatmap(items: List<Drink>) {
         set(Calendar.MONTH, month)
         set(Calendar.DAY_OF_MONTH, 1)
     }
+    
+    // 周一作为第一天
     val leading = (first.get(Calendar.DAY_OF_WEEK) + 5) % 7
     val daysInMonth = first.getActualMaximum(Calendar.DAY_OF_MONTH)
 
     Column {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        // 星期表头
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             listOf("一", "二", "三", "四", "五", "六", "日").forEach { label ->
                 Text(
                     text = label,
@@ -361,8 +364,8 @@ private fun MonthHeatmap(items: List<Drink>) {
                 )
             }
         }
-        Spacer(Modifier.height(8.dp))
 
+        // 日期网格
         val cells = leading + daysInMonth
         val rows = (cells + 6) / 7
         repeat(rows) { row ->
@@ -370,44 +373,38 @@ private fun MonthHeatmap(items: List<Drink>) {
                 repeat(7) { col ->
                     val index = row * 7 + col
                     val day = index - leading + 1
+                    
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .aspectRatio(1f)
-                            .padding(4.dp),
+                            .aspectRatio(1f) // 保持正方形比例
+                            .padding(6.dp), // 格子间距
                         contentAlignment = Alignment.Center
                     ) {
                         if (day in 1..daysInMonth) {
                             val drinksOfDay = dayRecords[day]
                             
                             if (!drinksOfDay.isNullOrEmpty()) {
-                                // 如果当天有喝过，显示第一杯的品牌Logo
+                                // 有记录：显示品牌图标
                                 val brand = Catalog.brandOf(drinksOfDay.first().brand)
                                 BrandBadge(
                                     badge = brand.badge,
                                     color = Color(brand.color),
-                                    size = 32.dp,
+                                    size = 32.dp, // 图标大小
                                     logo = brand.logo,
                                     squircle = Catalog.isSquircle(brand.name),
                                 )
                             } else {
-                                // 没喝过，显示浅色背景的数字
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        text = day.toString(),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = if (day == today) Caramel else PearlSoft,
-                                        fontWeight = if (day == today) FontWeight.Black else FontWeight.Normal,
-                                    )
-                                }
+                                // 无记录：显示纯数字（去掉背景方块）
+                                Text(
+                                    text = day.toString(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (day == today) Caramel else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = if (day == today) FontWeight.Bold else FontWeight.Normal,
+                                )
                             }
                         } else {
+                            // 空白格子
                             Spacer(Modifier.fillMaxSize())
                         }
                     }
