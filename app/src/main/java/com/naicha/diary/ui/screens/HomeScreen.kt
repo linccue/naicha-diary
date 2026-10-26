@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -217,7 +216,14 @@ fun HomeScreen(
                         // 排序按钮及下拉菜单
                         Box {
                             IconCircleButton(
-                                icon = { Icon(Icons.Default.Sort, "排序", tint = if (showSortMenu) Color.White else Color.Black) },
+                                icon = { 
+    Text(
+        text = "⇅", 
+        fontSize = 18.sp, 
+        fontWeight = FontWeight.Bold,
+        color = if (showSortMenu) Color.White else Color.Black
+    ) 
+},
                                 isActive = showSortMenu,
                                 onClick = { showSortMenu = true }
                             )
