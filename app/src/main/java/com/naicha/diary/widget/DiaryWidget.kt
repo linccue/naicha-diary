@@ -37,7 +37,6 @@ class DiaryWidget : AppWidgetProvider() {
         val nameText: String
 
         if (latest != null) {
-            // 如果像样例一样不加“喝过”，就把 " 喝过" 删掉即可，这里保留了“喝过”
             val dateStr = SimpleDateFormat("M月d日", Locale.CHINA).format(latest.timestamp)
             dateText = dateStr
             nameText = when {
@@ -50,12 +49,13 @@ class DiaryWidget : AppWidgetProvider() {
             nameText = "暂无记录"
         }
 
-        // 3. 最稳妥的跳转方案：自动去抓取 App 的桌面启动入口
-        // 这样不管你的启动页叫 MainActivity 还是别的，都能准确打开！
+        // 3. 设置点击跳转（打开 App）
+        // getLaunchIntentForPackage 是最稳的跳转方式，不需要写死 Activity 名字
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         launchIntent?.apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
+        
         val pendingIntent = if (launchIntent != null) {
             PendingIntent.getActivity(
                 context,
@@ -65,14 +65,14 @@ class DiaryWidget : AppWidgetProvider() {
             )
         } else null
 
-        // 4. 更新到桌面小部件
+        // 4. 更新界面
         for (appWidgetId in appWidgetIds) {
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
             views.setTextViewText(R.id.tv_month_count, countText)
             views.setTextViewText(R.id.tv_date, dateText)
             views.setTextViewText(R.id.tv_drink_name, nameText)
             
-            // 绑定点击事件
+            // 绑定点击事件给整个卡片
             if (pendingIntent != null) {
                 views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
             }
