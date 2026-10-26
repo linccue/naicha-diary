@@ -20,8 +20,8 @@
         android:orientation="horizontal">
       <!-- 猫咪图片稍微放大到 26dp -->
         <ImageView
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:src="@drawable/widget_cat"
             android:scaleType="fitCenter" />
 
@@ -61,7 +61,7 @@
                     android:layout_height="wrap_content"
                     android:text="0"
                     android:textColor="#000000"
-                    android:textSize="20sp"
+                    android:textSize="22sp"
                     android:textStyle="bold" />
                 
                 <TextView
@@ -97,7 +97,7 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:layout_marginTop="-1dp">
+            android:layout_marginTop="-2dp">
 
             <TextView
                 android:layout_width="5dp"
