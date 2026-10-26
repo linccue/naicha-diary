@@ -155,7 +155,7 @@ fun StatPill(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accent))
             Spacer(Modifier.width(5.dp))
-            Text(text = label, color = Color(0xFF888888), fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            Text(text = label, color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
         }
         Spacer(Modifier.height(10.dp))
         Text(text = value, color = Color(0xFF1E1E1E), fontSize = 22.sp, fontWeight = FontWeight.Black, maxLines = 1)
