@@ -70,12 +70,17 @@ fun HomeScreen(
     onOpenDetail: (Drink) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val todayItems = remember(items) {
-        items.filter { TimeUtil.isToday(it.timestamp) }
+      val monthItems = remember(items) {
+        val cal = java.util.Calendar.getInstance()
+        val y = cal.get(java.util.Calendar.YEAR)
+        val m = cal.get(java.util.Calendar.MONTH)
+        items.filter {
+            val c = java.util.Calendar.getInstance().apply { timeInMillis = it.timestamp }
+            c.get(java.util.Calendar.YEAR) == y && c.get(java.util.Calendar.MONTH) == m
+        }
     }
-    val todayCount = todayItems.size
-    val todayCalories = todayItems.sumOf { it.calories }
-    val todaySpend = todayItems.sumOf { it.price }
+    val monthCount = monthItems.size
+    val monthSpend = monthItems.sumOf { it.price }
     val recent = remember(items) { items.sortedByDescending { it.timestamp }.take(30) }
     val dateLabel = remember {
         SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date())
@@ -118,13 +123,11 @@ fun HomeScreen(
                 }
             }
 
-            item {
+                        item {
                 HeroCard(
-                    todayCount = todayCount,
-                    todayCalories = todayCalories,
-                    todaySpend = todaySpend,
-                    todayStyle = todayItems.maxByOrNull { it.timestamp }
-                        ?.categoryType ?: DrinkCategory.Tea,
+                    monthCount = monthCount,
+                    monthSpend = monthSpend,
+                    todayStyle = monthItems.maxByOrNull { it.timestamp }?.categoryType ?: DrinkCategory.Tea,
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
                 )
             }
@@ -162,13 +165,109 @@ fun HomeScreen(
 }
 
 @Composable
+@Composable
 private fun HeroCard(
-    todayCount: Int,
-    todayCalories: Int,
-    todaySpend: Double,
+    monthCount: Int,
+    monthSpend: Double,
     todayStyle: DrinkCategory,
     modifier: Modifier = Modifier,
 ) {
+    val liquid = when {
+        monthCount == 0 -> Color(0xFFD9C3AE)
+        monthCount == 1 -> Caramel
+        monthCount == 2 -> Taro
+        else -> Strawberry
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 18.dp,
+                shape = MaterialTheme.shapes.extraLarge,
+                ambientColor = Caramel.copy(alpha = 0.55f),
+                spotColor = Caramel.copy(alpha = 0.55f),
+            )
+            .clip(MaterialTheme.shapes.extraLarge)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFFEFBE93),
+                        Color(0xFFD89B69),
+                        Color(0xFFC0824F),
+                    ),
+                    start = Offset.Zero,
+                    end = Offset.Infinite,
+                )
+            ),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(190.dp)
+                .align(Alignment.TopEnd)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.28f), Color.Transparent),
+                    ),
+                    CircleShape,
+                )
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 22.dp, end = 6.dp, top = 20.dp, bottom = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "本月已喝",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.92f),
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    AnimatedNumber(
+                        value = monthCount,
+                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 62.sp),
+                        color = Color.White,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "杯",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Row {
+                    MiniStat(
+                        label = "本月花费",
+                        value = "¥${formatMoney(monthSpend)}",
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    MiniStat(
+                        label = "平均花费",
+                        value = "¥${formatMoney(if (monthCount > 0) monthSpend / monthCount else 0.0)}",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            DrinkCup(
+                modifier = Modifier
+                    .width(104.dp)
+                    .height(132.dp),
+                liquidColor = liquid,
+                strawColor = if (monthCount == 0) Color(0xFFB9A896) else Strawberry,
+                toppingCount = (3 + monthCount * 2).coerceAtMost(10),
+                style = cupStyleFor(todayStyle),
+            )
+        }
+    }
+} {
     val liquid = when {
         todayCount == 0 -> Color(0xFFD9C3AE)
         todayCount == 1 -> Caramel
