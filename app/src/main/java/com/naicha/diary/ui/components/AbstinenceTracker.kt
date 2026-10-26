@@ -2,6 +2,9 @@ package com.naicha.diary.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import com.naicha.diary.widget.AbstinenceWidget
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +35,18 @@ import java.util.Locale
 
 @Composable
 fun AbstinenceTracker(
+    fun updateWidget(context: android.content.Context) {
+    val manager = AppWidgetManager.getInstance(context)
+    val component = ComponentName(context, AbstinenceWidget::class.java)
+    val ids = manager.getAppWidgetIds(component)
+    if (ids.isNotEmpty()) {
+        val intent = android.content.Intent(context, AbstinenceWidget::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        }
+        context.sendBroadcast(intent)
+    }
+}
     modifier: Modifier = Modifier,
     onOpenSettings: () -> Unit = {} // 新增：打开设置的点击事件
 ) {
@@ -279,6 +294,7 @@ fun AbstinenceTracker(
                         val newDrankDays = if (isTodayDrank) drankDays - todayDiff else drankDays + todayDiff
                         drankDaysStr = newDrankDays.joinToString(",")
                         prefs.edit().putString("drank_days", drankDaysStr).apply()
+                        updateWidget(context)
                     }
                     .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center
@@ -337,6 +353,7 @@ fun AbstinenceTracker(
                                 .clickable {
                                     isTracking = false
                                     prefs.edit().putBoolean("is_tracking", false).apply()
+                                    updateWidget(context)
                                     showEndDialog = false
                                 }
                                 .padding(vertical = 14.dp),
