@@ -1,5 +1,6 @@
 package com.naicha.diary.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -7,16 +8,22 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,7 +45,6 @@ import com.naicha.diary.ui.components.DrinkCup
 import com.naicha.diary.ui.components.cupStyleFor
 import com.naicha.diary.ui.components.PearlField
 import com.naicha.diary.ui.components.RatingStars
-import com.naicha.diary.ui.components.SectionHeader
 import com.naicha.diary.ui.components.SoftCard
 import com.naicha.diary.ui.theme.Caramel
 import com.naicha.diary.ui.theme.PearlSoft
@@ -59,7 +65,17 @@ fun HomeScreen(
     onOpenDetail: (Drink) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 计算本月的数据
+    // === 状态控制 ===
+    var showCategory by remember { mutableStateOf(false) }
+    var showSortMenu by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
+    
+    var selectedCategory by remember { mutableStateOf("全部") }
+    var sortOrder by remember { mutableStateOf("默认") }
+    var searchQuery by remember { mutableStateOf("") }
+    var activeQuickFilter by remember { mutableStateOf<String?>(null) }
+
+    // 计算本月数据
     val monthItems = remember(items) {
         val cal = Calendar.getInstance()
         val y = cal.get(Calendar.YEAR)
@@ -71,24 +87,67 @@ fun HomeScreen(
     }
     val monthCount = monthItems.size
     val monthSpend = monthItems.sumOf { it.price }
-    
-    val recent = remember(items) { items.sortedByDescending { it.timestamp }.take(30) }
-    val dateLabel = remember {
-        SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date())
+    val dateLabel = remember { SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date()) }
+
+    // === 数据处理：过滤和排序 ===
+    val processedItems = remember(items, selectedCategory, sortOrder, searchQuery, activeQuickFilter) {
+        var result = items
+
+        // 1. 分类过滤
+        if (selectedCategory != "全部") {
+            val catLabel = if (selectedCategory == "茶饮") DrinkCategory.Tea.label else DrinkCategory.Coffee.label
+            result = result.filter { it.category == catLabel }
+        }
+
+        // 2. 搜索词过滤
+        if (searchQuery.isNotBlank()) {
+            val q = searchQuery.trim()
+            result = result.filter {
+                it.brand.contains(q, ignoreCase = true) ||
+                it.name.contains(q, ignoreCase = true) ||
+                it.toppings.any { t -> t.contains(q, ignoreCase = true) }
+            }
+        }
+
+        // 3. 快捷标签过滤
+        when (activeQuickFilter) {
+            "无限复购" -> {
+                val counts = items.groupingBy { it.brand + it.name }.eachCount()
+                result = result.filter { counts[it.brand + it.name] ?: 0 > 3 }
+            }
+            "心头好" -> result = result.filter { it.rating == 5 }
+            "本月" -> result = result.filter { mItem -> monthItems.any { it.id == mItem.id } }
+            "本周" -> {
+                val cal = Calendar.getInstance()
+                cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                val weekStart = cal.timeInMillis
+                result = result.filter { it.timestamp >= weekStart }
+            }
+        }
+
+        // 4. 排序
+        result = when (sortOrder) {
+            "评分由高到低" -> result.sortedByDescending { it.rating }
+            "时间顺序" -> result.sortedByDescending { it.timestamp }
+            else -> result.reversed() // 默认顺序：后添加的在上
+        }
+
+        result.take(30)
     }
 
     Box(modifier.fillMaxSize()) {
         PearlField(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
             count = 14,
             seed = 3,
         )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 132.dp), // 修复滑动卡底
+            contentPadding = PaddingValues(bottom = 132.dp),
         ) {
             item {
                 Row(
@@ -132,18 +191,154 @@ fun HomeScreen(
                 )
             }
 
+            // === 核心控制栏 ===
             item {
-                SectionHeader(
-                    title = "最近喝过",
-                    subtitle = if (recent.isEmpty()) "第一杯，从今天开始" else "共 ${items.size} 杯回忆",
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
-                )
+                Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "最近喝过",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        
+                        // 分类按钮
+                        IconCircleButton(
+                            icon = { Icon(Icons.Default.Menu, "分类", tint = if (showCategory) Color.White else Color.Black) },
+                            isActive = showCategory,
+                            onClick = { 
+                                showCategory = !showCategory
+                                if (showCategory) showSearch = false
+                            }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        
+                        // 排序按钮及下拉菜单
+                        Box {
+                            IconCircleButton(
+                                icon = { Icon(Icons.Default.Sort, "排序", tint = if (showSortMenu) Color.White else Color.Black) },
+                                isActive = showSortMenu,
+                                onClick = { showSortMenu = true }
+                            )
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false },
+                                modifier = Modifier
+                                    .background(Color.White, RoundedCornerShape(20.dp))
+                                    .shadow(8.dp)
+                                    .padding(vertical = 8.dp)
+                            ) {
+                                listOf("默认", "评分由高到低", "时间顺序").forEach { option ->
+                                    val isSelected = sortOrder == option
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isSelected) Color.Black else Color.Transparent)
+                                            .clickable {
+                                                sortOrder = option
+                                                showSortMenu = false
+                                            }
+                                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    ) {
+                                        Text(
+                                            text = option,
+                                            color = if (isSelected) Color.White else Color.Black,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        
+                        // 搜索按钮
+                        IconCircleButton(
+                            icon = { Icon(Icons.Default.Search, "搜索", tint = if (showSearch) Color.White else Color.Black) },
+                            isActive = showSearch,
+                            onClick = { 
+                                showSearch = !showSearch
+                                if (!showSearch) {
+                                    searchQuery = ""
+                                    activeQuickFilter = null
+                                }
+                                if (showSearch) showCategory = false
+                            }
+                        )
+                    }
+                    
+                    // 分类栏
+                    AnimatedVisibility(visible = showCategory) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("全部", "茶饮", "咖啡").forEach { cat ->
+                                FilterChipCustom(
+                                    text = cat,
+                                    selected = selectedCategory == cat,
+                                    onClick = { selectedCategory = cat }
+                                )
+                            }
+                        }
+                    }
+
+                    // 搜索栏
+                    AnimatedVisibility(visible = showSearch) {
+                        Column(modifier = Modifier.padding(top = 12.dp)) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("搜索品牌/品项/加料", color = Color.Gray) },
+                                leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Black) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        Icon(
+                                            Icons.Default.Close, "清空",
+                                            modifier = Modifier.clickable { searchQuery = "" }
+                                        )
+                                    }
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(24.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf("无限复购", "心头好", "本月", "本周").forEach { filter ->
+                                    FilterChipCustom(
+                                        text = filter,
+                                        selected = activeQuickFilter == filter,
+                                        onClick = { 
+                                            activeQuickFilter = if (activeQuickFilter == filter) null else filter 
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
-            if (recent.isEmpty()) {
+            if (processedItems.isEmpty()) {
                 item { EmptyHint(onRecord = onRecord) }
             } else {
-                items(recent, key = { it.id }) { tea ->
+                items(processedItems, key = { it.id }) { tea ->
                     TeaRow(
                         tea = tea,
                         onClick = { onOpenDetail(tea) },
@@ -154,6 +349,51 @@ fun HomeScreen(
         }
     }
 }
+
+// === 自定义 UI 组件 ===
+
+@Composable
+private fun IconCircleButton(
+    icon: @Composable () -> Unit,
+    isActive: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(if (isActive) Color.Black else Color.Transparent)
+            .border(1.dp, if (isActive) Color.Black else Color.LightGray, CircleShape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        icon()
+    }
+}
+
+@Composable
+private fun FilterChipCustom(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) Color.Black else Color.Transparent)
+            .border(1.dp, if (selected) Color.Black else Color.LightGray, RoundedCornerShape(50))
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) Color.White else Color.Gray
+        )
+    }
+}
+
+// === 原有的组件（保留不变） ===
 
 @Composable
 private fun HeroCard(
@@ -181,11 +421,7 @@ private fun HeroCard(
             .clip(MaterialTheme.shapes.extraLarge)
             .background(
                 Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFFEFBE93),
-                        Color(0xFFD89B69),
-                        Color(0xFFC0824F),
-                    ),
+                    colors = listOf(Color(0xFFEFBE93), Color(0xFFD89B69), Color(0xFFC0824F)),
                     start = Offset.Zero,
                     end = Offset.Infinite,
                 )
@@ -195,12 +431,7 @@ private fun HeroCard(
             modifier = Modifier
                 .size(190.dp)
                 .align(Alignment.TopEnd)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.28f), Color.Transparent),
-                    ),
-                    CircleShape,
-                )
+                .background(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.28f), Color.Transparent)), CircleShape)
         )
 
         Row(
@@ -210,11 +441,7 @@ private fun HeroCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "本月已喝",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.92f),
-                )
+                Text(text = "本月已喝", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.92f))
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     AnimatedNumber(
@@ -232,11 +459,7 @@ private fun HeroCard(
                 }
                 Spacer(Modifier.height(12.dp))
                 Row {
-                    MiniStat(
-                        label = "本月花费",
-                        value = "¥${formatMoney(monthSpend)}",
-                        modifier = Modifier.weight(1f),
-                    )
+                    MiniStat(label = "本月花费", value = "¥${formatMoney(monthSpend)}", modifier = Modifier.weight(1f))
                     Spacer(Modifier.width(8.dp))
                     MiniStat(
                         label = "平均花费",
@@ -247,9 +470,7 @@ private fun HeroCard(
             }
 
             DrinkCup(
-                modifier = Modifier
-                    .width(104.dp)
-                    .height(132.dp),
+                modifier = Modifier.width(104.dp).height(132.dp),
                 liquidColor = liquid,
                 strawColor = if (monthCount == 0) Color(0xFFB9A896) else Strawberry,
                 toppingCount = (3 + monthCount * 2).coerceAtMost(10),
@@ -267,27 +488,13 @@ private fun MiniStat(label: String, value: String, modifier: Modifier = Modifier
             .background(Color.White.copy(alpha = 0.20f))
             .padding(horizontal = 10.dp, vertical = 7.dp),
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.78f),
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelLarge,
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-        )
+        Text(text = label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.78f))
+        Text(text = value, style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-private fun QuickActions(
-    onRecord: () -> Unit,
-    onAiRecord: () -> Unit,
-    onOpenWall: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun QuickActions(onRecord: () -> Unit, onAiRecord: () -> Unit, onOpenWall: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth()) {
         AiBanner(onClick = onAiRecord)
         Spacer(Modifier.height(12.dp))
@@ -319,10 +526,7 @@ private fun AiBanner(onClick: () -> Unit) {
     val shift by transition.animateFloat(
         initialValue = -1f,
         targetValue = 2f,
-        animationSpec = infiniteRepeatable(
-            tween(2600, easing = LinearEasing),
-            RepeatMode.Restart,
-        ),
+        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Restart),
         label = "aiShift",
     )
 
@@ -330,91 +534,46 @@ private fun AiBanner(onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(
-                    elevation = 14.dp,
-                    shape = MaterialTheme.shapes.large,
-                    ambientColor = Taro.copy(alpha = 0.55f),
-                    spotColor = Taro.copy(alpha = 0.55f),
-                )
+                .shadow(elevation = 14.dp, shape = MaterialTheme.shapes.large, ambientColor = Taro.copy(alpha = 0.55f), spotColor = Taro.copy(alpha = 0.55f))
                 .clip(MaterialTheme.shapes.large)
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFF6C5CE7), Color(0xFF8E7CF0), Color(0xFFB79CED))
-                    )
-                ),
+                .background(Brush.linearGradient(listOf(Color(0xFF6C5CE7), Color(0xFF8E7CF0), Color(0xFFB79CED)))),
         ) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.White.copy(alpha = 0.22f),
-                                Color.Transparent,
-                            ),
+                            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.22f), Color.Transparent),
                             start = Offset(shift * 600f - 300f, 0f),
                             end = Offset(shift * 600f, 400f),
                         )
                     )
             )
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.22f)),
+                    modifier = Modifier.size(46.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.22f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(text = "🤖", fontSize = 23.sp)
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "AI 识图 · 拍一下就好",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = "小票 / 杯身 / 订单截图，自动填好",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.86f),
-                    )
+                    Text(text = "AI 识图 · 拍一下就好", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(text = "小票 / 杯身 / 订单截图，自动填好", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.86f))
                 }
-                Text(
-                    text = "→",
-                    fontSize = 20.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                )
+                Text(text = "→", fontSize = 20.sp, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun ActionTile(
-    title: String,
-    subtitle: String,
-    emoji: String,
-    colors: List<Color>,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun ActionTile(title: String, subtitle: String, emoji: String, colors: List<Color>, onClick: () -> Unit, modifier: Modifier = Modifier) {
     BouncyBox(onClick = onClick, modifier = modifier) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(
-                    elevation = 12.dp,
-                    shape = MaterialTheme.shapes.large,
-                    ambientColor = colors.first().copy(alpha = 0.45f),
-                    spotColor = colors.first().copy(alpha = 0.45f),
-                )
+                .shadow(elevation = 12.dp, shape = MaterialTheme.shapes.large, ambientColor = colors.first().copy(alpha = 0.45f), spotColor = colors.first().copy(alpha = 0.45f))
                 .clip(MaterialTheme.shapes.large)
                 .background(Brush.linearGradient(colors))
                 .padding(horizontal = 16.dp, vertical = 16.dp),
@@ -422,39 +581,20 @@ private fun ActionTile(
             Column {
                 Text(text = emoji, fontSize = 22.sp)
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.85f),
-                )
+                Text(text = title, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(text = subtitle, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f))
             }
         }
     }
 }
 
 @Composable
-private fun TeaRow(
-    tea: Drink,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val brand = Catalog.brandOf(tea.brand)
-    SoftCard(
-        modifier = modifier,
-        elevation = 4.dp,
-        contentPadding = PaddingValues(0.dp),
-    ) {
+    SoftCard(modifier = modifier, elevation = 4.dp, contentPadding = PaddingValues(0.dp)) {
         BouncyBox(onClick = onClick) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BrandBadge(
@@ -463,9 +603,7 @@ private fun TeaRow(
                     logo = brand.logo,
                     squircle = Catalog.isSquircle(brand.name),
                 )
-
                 Spacer(Modifier.width(12.dp))
-
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -502,11 +640,7 @@ private fun TeaRow(
                         RatingStars(rating = tea.rating, starSize = 13.dp)
                         Spacer(Modifier.weight(1f))
                         if (tea.price > 0) {
-                            Text(
-                                text = "¥${formatMoney(tea.price)}",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = Caramel,
-                            )
+                            Text(text = "¥${formatMoney(tea.price)}", style = MaterialTheme.typography.labelLarge, color = Caramel)
                         }
                     }
                 }
@@ -518,31 +652,14 @@ private fun TeaRow(
 @Composable
 private fun EmptyHint(onRecord: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 18.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        DrinkCup(
-            modifier = Modifier
-                .width(120.dp)
-                .height(150.dp),
-            liquidColor = Color(0xFFDCC7B4),
-            strawColor = Color(0xFFC9B5A3),
-            toppingCount = 3,
-        )
+        DrinkCup(modifier = Modifier.width(120.dp).height(150.dp), liquidColor = Color(0xFFDCC7B4), strawColor = Color(0xFFC9B5A3), toppingCount = 3)
         Spacer(Modifier.height(14.dp))
-        Text(
-            text = "还没有记录哦",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Text(text = "还没有记录哦", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(4.dp))
-        Text(
-            text = "喝下的每一杯，都值得被记住",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text(text = "喝下的每一杯，都值得被记住", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
