@@ -51,6 +51,7 @@ import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.Drink
 import com.naicha.diary.net.DeepSeekClient
 import com.naicha.diary.ui.components.AnimatedNumber
+import com.naicha.diary.ui.components.BrandBadge
 import com.naicha.diary.ui.components.GradientButton
 import com.naicha.diary.ui.components.PearlField
 import com.naicha.diary.ui.components.SectionHeader
@@ -330,13 +331,14 @@ private fun MonthHeatmap(items: List<Drink>) {
     val month = calendar.get(Calendar.MONTH)
     val today = calendar.get(Calendar.DAY_OF_MONTH)
 
-    val perDay = remember(items, year, month) {
+    // 把记录按日期分组
+    val dayRecords = remember(items, year, month) {
         items.filter {
             val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
             c.get(Calendar.YEAR) == year && c.get(Calendar.MONTH) == month
-        }.groupingBy {
+        }.groupBy {
             Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.DAY_OF_MONTH)
-        }.eachCount()
+        }
     }
 
     val first = Calendar.getInstance().apply {
@@ -346,7 +348,6 @@ private fun MonthHeatmap(items: List<Drink>) {
     }
     val leading = (first.get(Calendar.DAY_OF_WEEK) + 5) % 7
     val daysInMonth = first.getActualMaximum(Calendar.DAY_OF_MONTH)
-    val maxCount = perDay.values.maxOrNull()?.coerceAtLeast(1) ?: 1
 
     Column {
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -356,6 +357,7 @@ private fun MonthHeatmap(items: List<Drink>) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
         }
@@ -368,32 +370,45 @@ private fun MonthHeatmap(items: List<Drink>) {
                 repeat(7) { col ->
                     val index = row * 7 + col
                     val day = index - leading + 1
-                    Box(modifier = Modifier.weight(1f).padding(2.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         if (day in 1..daysInMonth) {
-                            val count = perDay[day] ?: 0
-                            val intensity = if (count == 0) 0f else {
-                                (0.28f + count.toFloat() / maxCount * 0.72f)
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (count == 0) MaterialTheme.colorScheme.surfaceContainerLow
-                                        else Caramel.copy(alpha = intensity)
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = day.toString(),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (count == 0) PearlSoft else Color.White,
-                                    fontWeight = if (day == today) FontWeight.Black else FontWeight.Normal,
+                            val drinksOfDay = dayRecords[day]
+                            
+                            if (!drinksOfDay.isNullOrEmpty()) {
+                                // 如果当天有喝过，显示第一杯的品牌Logo
+                                val brand = Catalog.brandOf(drinksOfDay.first().brand)
+                                BrandBadge(
+                                    badge = brand.badge,
+                                    color = Color(brand.color),
+                                    size = 32.dp,
+                                    logo = brand.logo,
+                                    squircle = Catalog.isSquircle(brand.name),
                                 )
+                            } else {
+                                // 没喝过，显示浅色背景的数字
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = day.toString(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (day == today) Caramel else PearlSoft,
+                                        fontWeight = if (day == today) FontWeight.Black else FontWeight.Normal,
+                                    )
+                                }
                             }
                         } else {
-                            Spacer(Modifier.fillMaxWidth().aspectRatio(1f))
+                            Spacer(Modifier.fillMaxSize())
                         }
                     }
                 }
@@ -401,7 +416,6 @@ private fun MonthHeatmap(items: List<Drink>) {
         }
     }
 }
-
 @Composable
 private fun Achievements(items: List<Drink>, streak: Int) {
     val brandCount = items.map { it.brand }.distinct().size
