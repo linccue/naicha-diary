@@ -40,6 +40,9 @@ class DrinkRepository(context: Context) {
     fun remove(id: String) = persist(_items.value.filterNot { it.id == id })
 
     fun clearAll() = persist(emptyList())
+        fun replaceAll(newItems: List<Drink>) {
+        persist(newItems)
+    }
 
     fun sorted(): List<Drink> = _items.value.sortedByDescending { it.timestamp }
 }
