@@ -47,9 +47,10 @@ class AbstinenceWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.tv_abs_sub, "还差 ${targetDays - todayDiff - 1} 天")
         }
 
-        // 点击打开 App
+        // 设置点击跳转
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         launchIntent?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
+        
         val pendingIntent = if (launchIntent != null) {
             PendingIntent.getActivity(context, 0, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         } else null
