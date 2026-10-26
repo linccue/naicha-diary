@@ -227,38 +227,51 @@ fun HomeScreen(
                                 isActive = showSortMenu,
                                 onClick = { showSortMenu = true }
                             )
-                            DropdownMenu(
+                                                        DropdownMenu(
                                 expanded = showSortMenu,
                                 onDismissRequest = { showSortMenu = false },
-                                modifier = Modifier
-                                    .background(Color.White, RoundedCornerShape(20.dp))
-                                    .shadow(8.dp)
-                                    .padding(vertical = 8.dp)
+                                modifier = Modifier.background(Color.Transparent), // 去掉系统默认底色
                             ) {
-                                listOf("默认", "评分由高到低", "时间顺序").forEach { option ->
-                                    val isSelected = sortOrder == option
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isSelected) Color.Black else Color.Transparent)
-                                            .clickable {
-                                                sortOrder = option
-                                                showSortMenu = false
-                                            }
-                                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                                    ) {
-                                        Text(
-                                            text = option,
-                                            color = if (isSelected) Color.White else Color.Black,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
+                                // 外层大圆角容器，带浅灰底色和阴影
+                                Column(
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .shadow(12.dp, RoundedCornerShape(24.dp))
+                                        .background(Color(0xFFF4F5F7), RoundedCornerShape(24.dp))
+                                        .padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf("默认", "评分由高到低", "时间顺序", "稀有度排序").forEach { option ->
+                                        val isSelected = sortOrder == option
+                                        
+                                        // 每个选项独立成卡片
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .shadow(
+                                                    elevation = if (isSelected) 6.dp else 1.dp,
+                                                    shape = RoundedCornerShape(20.dp),
+                                                    ambientColor = Color.Black.copy(alpha = 0.1f),
+                                                    spotColor = Color.Black.copy(alpha = 0.1f)
+                                                )
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(if (isSelected) Color.Black else Color.White)
+                                                .clickable {
+                                                    sortOrder = option
+                                                    showSortMenu = false
+                                                }
+                                                .padding(horizontal = 20.dp, vertical = 16.dp)
+                                        ) {
+                                            Text(
+                                                text = option,
+                                                color = if (isSelected) Color.White else Color.Black,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
                         Spacer(Modifier.width(8.dp))
                         
                         // 搜索按钮
