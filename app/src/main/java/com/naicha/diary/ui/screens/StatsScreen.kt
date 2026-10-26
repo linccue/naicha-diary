@@ -57,6 +57,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                 }
             }
 
+            // === 顶部 6 个质感小卡片 ===
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatPill(label = "总杯数", value = total.toString(), accent = Caramel, modifier = Modifier.weight(1f))
@@ -74,6 +75,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
             }
 
             if (total > 0) {
+                // === 下方的所有数据卡片 ===
                 item {
                     SoftCard {
                         SectionHeader(title = "品牌分布", subtitle = "喝得最多的那几家")
@@ -160,7 +162,8 @@ fun StatPill(
     }
 }
 
-// ================= 各模块组件逻辑 =================
+// ================= 下方各模块组件 =================
+
 @Composable
 private fun WeekRhythmCard(items: List<Drink>) {
     val weekData = remember(items) {
