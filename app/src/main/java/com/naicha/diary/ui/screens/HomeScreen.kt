@@ -7,19 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -58,6 +46,7 @@ import com.naicha.diary.ui.theme.Strawberry
 import com.naicha.diary.ui.theme.Taro
 import com.naicha.diary.util.TimeUtil
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -70,17 +59,19 @@ fun HomeScreen(
     onOpenDetail: (Drink) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-      val monthItems = remember(items) {
-        val cal = java.util.Calendar.getInstance()
-        val y = cal.get(java.util.Calendar.YEAR)
-        val m = cal.get(java.util.Calendar.MONTH)
+    // 计算本月的数据
+    val monthItems = remember(items) {
+        val cal = Calendar.getInstance()
+        val y = cal.get(Calendar.YEAR)
+        val m = cal.get(Calendar.MONTH)
         items.filter {
-            val c = java.util.Calendar.getInstance().apply { timeInMillis = it.timestamp }
-            c.get(java.util.Calendar.YEAR) == y && c.get(java.util.Calendar.MONTH) == m
+            val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
+            c.get(Calendar.YEAR) == y && c.get(Calendar.MONTH) == m
         }
     }
     val monthCount = monthItems.size
     val monthSpend = monthItems.sumOf { it.price }
+    
     val recent = remember(items) { items.sortedByDescending { it.timestamp }.take(30) }
     val dateLabel = remember {
         SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date())
@@ -97,7 +88,7 @@ fun HomeScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 132.dp),
+            contentPadding = PaddingValues(bottom = 132.dp), // 修复滑动卡底
         ) {
             item {
                 Row(
@@ -123,7 +114,7 @@ fun HomeScreen(
                 }
             }
 
-                        item {
+            item {
                 HeroCard(
                     monthCount = monthCount,
                     monthSpend = monthSpend,
@@ -164,7 +155,6 @@ fun HomeScreen(
     }
 }
 
-@Composable
 @Composable
 private fun HeroCard(
     monthCount: Int,
@@ -263,102 +253,6 @@ private fun HeroCard(
                 liquidColor = liquid,
                 strawColor = if (monthCount == 0) Color(0xFFB9A896) else Strawberry,
                 toppingCount = (3 + monthCount * 2).coerceAtMost(10),
-                style = cupStyleFor(todayStyle),
-            )
-        }
-    }
-} {
-    val liquid = when {
-        todayCount == 0 -> Color(0xFFD9C3AE)
-        todayCount == 1 -> Caramel
-        todayCount == 2 -> Taro
-        else -> Strawberry
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 18.dp,
-                shape = MaterialTheme.shapes.extraLarge,
-                ambientColor = Caramel.copy(alpha = 0.55f),
-                spotColor = Caramel.copy(alpha = 0.55f),
-            )
-            .clip(MaterialTheme.shapes.extraLarge)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFFEFBE93),
-                        Color(0xFFD89B69),
-                        Color(0xFFC0824F),
-                    ),
-                    start = Offset.Zero,
-                    end = Offset.Infinite,
-                )
-            ),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(190.dp)
-                .align(Alignment.TopEnd)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.28f), Color.Transparent),
-                    ),
-                    CircleShape,
-                )
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 22.dp, end = 6.dp, top = 20.dp, bottom = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (todayCount == 0) "今天还没喝呢" else "今天已经喝了",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.92f),
-                )
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    AnimatedNumber(
-                        value = todayCount,
-                        style = MaterialTheme.typography.displaySmall.copy(fontSize = 62.sp),
-                        color = Color.White,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "杯",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                Row {
-                    MiniStat(
-                        label = "热量",
-                        value = "${todayCalories}kcal",
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    MiniStat(
-                        label = "花费",
-                        value = "¥${formatMoney(todaySpend)}",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-
-            DrinkCup(
-                modifier = Modifier
-                    .width(104.dp)
-                    .height(132.dp),
-                liquidColor = liquid,
-                strawColor = if (todayCount == 0) Color(0xFFB9A896) else Strawberry,
-                toppingCount = (3 + todayCount * 2).coerceAtMost(10),
                 style = cupStyleFor(todayStyle),
             )
         }
@@ -564,11 +458,11 @@ private fun TeaRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BrandBadge(
-                            badge = brand.badge,
-                            color = Color(brand.color),
-                            logo = brand.logo,
-                            squircle = Catalog.isSquircle(brand.name),
-                        )
+                    badge = brand.badge,
+                    color = Color(brand.color),
+                    logo = brand.logo,
+                    squircle = Catalog.isSquircle(brand.name),
+                )
 
                 Spacer(Modifier.width(12.dp))
 
