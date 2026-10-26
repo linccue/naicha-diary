@@ -64,7 +64,6 @@ fun HomeScreen(
     onOpenDetail: (Drink) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // === 状态控制 ===
     var showCategory by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -74,7 +73,6 @@ fun HomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var activeQuickFilter by remember { mutableStateOf<String?>(null) }
 
-    // 计算本月数据
     val monthItems = remember(items) {
         val cal = Calendar.getInstance()
         val y = cal.get(Calendar.YEAR)
@@ -88,17 +86,14 @@ fun HomeScreen(
     val monthSpend = monthItems.sumOf { it.price }
     val dateLabel = remember { SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date()) }
 
-    // === 数据处理：过滤和排序 ===
     val processedItems = remember(items, selectedCategory, sortOrder, searchQuery, activeQuickFilter) {
         var result = items
 
-        // 1. 分类过滤
         if (selectedCategory != "全部") {
             val catLabel = if (selectedCategory == "茶饮") DrinkCategory.Tea.label else DrinkCategory.Coffee.label
             result = result.filter { it.category == catLabel }
         }
 
-        // 2. 搜索词过滤
         if (searchQuery.isNotBlank()) {
             val q = searchQuery.trim()
             result = result.filter {
@@ -108,7 +103,6 @@ fun HomeScreen(
             }
         }
 
-        // 3. 快捷标签过滤
         when (activeQuickFilter) {
             "无限复购" -> {
                 val counts = items.groupingBy { it.brand + it.name }.eachCount()
@@ -127,11 +121,10 @@ fun HomeScreen(
             }
         }
 
-        // 4. 排序
         result = when (sortOrder) {
             "评分由高到低" -> result.sortedByDescending { it.rating }
             "时间顺序" -> result.sortedByDescending { it.timestamp }
-            else -> result.reversed() // 默认顺序：后添加的在上
+            else -> result.reversed()
         }
 
         result.take(30)
@@ -190,7 +183,6 @@ fun HomeScreen(
                 )
             }
 
-            // === 核心控制栏 ===
             item {
                 Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -202,7 +194,6 @@ fun HomeScreen(
                         )
                         Spacer(Modifier.weight(1f))
                         
-                        // 分类按钮
                         IconCircleButton(
                             icon = { Icon(Icons.Default.Menu, "分类", tint = if (showCategory) Color.White else Color.Black) },
                             isActive = showCategory,
@@ -213,26 +204,24 @@ fun HomeScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         
-                        // 排序按钮及下拉菜单
                         Box {
                             IconCircleButton(
                                 icon = { 
-    Text(
-        text = "⇅", 
-        fontSize = 18.sp, 
-        fontWeight = FontWeight.Bold,
-        color = if (showSortMenu) Color.White else Color.Black
-    ) 
-},
+                                    Text(
+                                        text = "⇅", 
+                                        fontSize = 18.sp, 
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (showSortMenu) Color.White else Color.Black
+                                    ) 
+                                },
                                 isActive = showSortMenu,
                                 onClick = { showSortMenu = true }
                             )
-                                                        DropdownMenu(
+                            DropdownMenu(
                                 expanded = showSortMenu,
                                 onDismissRequest = { showSortMenu = false },
-                                modifier = Modifier.background(Color.Transparent), // 去掉系统默认底色
+                                modifier = Modifier.background(Color.Transparent),
                             ) {
-                                // 外层大圆角容器，带浅灰底色和阴影
                                 Column(
                                     modifier = Modifier
                                         .padding(8.dp)
@@ -241,10 +230,8 @@ fun HomeScreen(
                                         .padding(10.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    listOf("默认", "评分由高到低", "时间顺序", "稀有度排序").forEach { option ->
+                                    listOf("默认", "评分由高到低", "时间顺序").forEach { option ->
                                         val isSelected = sortOrder == option
-                                        
-                                        // 每个选项独立成卡片
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -272,9 +259,9 @@ fun HomeScreen(
                                     }
                                 }
                             }
+                        }
                         Spacer(Modifier.width(8.dp))
                         
-                        // 搜索按钮
                         IconCircleButton(
                             icon = { Icon(Icons.Default.Search, "搜索", tint = if (showSearch) Color.White else Color.Black) },
                             isActive = showSearch,
@@ -289,7 +276,6 @@ fun HomeScreen(
                         )
                     }
                     
-                    // 分类栏
                     AnimatedVisibility(visible = showCategory) {
                         Row(
                             modifier = Modifier
@@ -308,7 +294,6 @@ fun HomeScreen(
                         }
                     }
 
-                    // 搜索栏
                     AnimatedVisibility(visible = showSearch) {
                         Column(modifier = Modifier.padding(top = 12.dp)) {
                             OutlinedTextField(
@@ -369,8 +354,6 @@ fun HomeScreen(
     }
 }
 
-// === 自定义 UI 组件 ===
-
 @Composable
 private fun IconCircleButton(
     icon: @Composable () -> Unit,
@@ -411,8 +394,6 @@ private fun FilterChipCustom(
         )
     }
 }
-
-// === 原有的组件（保留不变） ===
 
 @Composable
 private fun HeroCard(
