@@ -57,18 +57,66 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatPill(label = "总杯数", value = total.toString(), accent = Caramel, modifier = Modifier.weight(1f))
-                    StatPill(label = "总花费", value = "¥${formatMoney(totalSpend)}", accent = Taro, modifier = Modifier.weight(1f))
-                    StatPill(label = "连续天数", value = "$streak 天", accent = Matcha, modifier = Modifier.weight(1f))
-                }
-            }
-
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatPill(label = "平均单价", value = "¥${formatMoney(avgPrice)}", accent = Sky, modifier = Modifier.weight(1f))
-                    StatPill(label = "平均评分", value = String.format("%.1f", avgRating), accent = Strawberry, modifier = Modifier.weight(1f))
-                    StatPill(label = "总热量", value = "${totalCalories}", accent = Color(0xFFE07A5F), modifier = Modifier.weight(1f))
-                }
+                   @Composable
+fun StatPill(
+    label: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            // 1. 大圆角 + 带微主题色的柔和阴影（让卡片浮起来，且不显脏）
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(18.dp),
+                ambientColor = accent.copy(alpha = 0.25f),
+                spotColor = accent.copy(alpha = 0.25f)
+            )
+            .clip(RoundedCornerShape(18.dp))
+            // 2. 极其轻微的白色到主题浅色的渐变底，比纯白更有质感
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White,
+                        accent.copy(alpha = 0.06f)
+                    )
+                )
+            )
+            // 3. 加一圈极细的主题色边框，强化轮廓
+            .border(0.8.dp, accent.copy(alpha = 0.15f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 10.dp, vertical = 14.dp)
+    ) {
+        // 顶部：小圆点 + 标签
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(accent)
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text = label,
+                color = Color(0xFF888888), // 统一的灰色标签
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
+            )
+        }
+        
+        Spacer(Modifier.height(10.dp))
+        
+        // 底部：超大、超粗的深色数字，极其显眼
+        Text(
+            text = value,
+            color = Color(0xFF1E1E1E),
+            fontSize = 22.sp, 
+            fontWeight = FontWeight.Black, 
+            maxLines = 1
+        )
+    }
+}
             }
 
             if (total > 0) {
