@@ -1,10 +1,11 @@
 package com.naicha.diary.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
-import com.naicha.diary.widget.AbstinenceWidget
+import android.content.Context
+import android.content.Intent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.naicha.diary.widget.AbstinenceWidget
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -35,23 +37,11 @@ import java.util.Locale
 
 @Composable
 fun AbstinenceTracker(
-    fun updateWidget(context: android.content.Context) {
-    val manager = AppWidgetManager.getInstance(context)
-    val component = ComponentName(context, AbstinenceWidget::class.java)
-    val ids = manager.getAppWidgetIds(component)
-    if (ids.isNotEmpty()) {
-        val intent = android.content.Intent(context, AbstinenceWidget::class.java).apply {
-            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-        }
-        context.sendBroadcast(intent)
-    }
-}
     modifier: Modifier = Modifier,
-    onOpenSettings: () -> Unit = {} // 新增：打开设置的点击事件
+    onOpenSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("abstinence_prefs", android.content.Context.MODE_PRIVATE) }
+    val prefs = remember { context.getSharedPreferences("abstinence_prefs", Context.MODE_PRIVATE) }
 
     var isTracking by remember { mutableStateOf(prefs.getBoolean("is_tracking", false)) }
     var targetDays by remember { mutableIntStateOf(prefs.getInt("target_days", 7)) }
@@ -59,7 +49,7 @@ fun AbstinenceTracker(
     var drankDaysStr by remember { mutableStateOf(prefs.getString("drank_days", "") ?: "") }
     
     var selectedGoal by remember { mutableIntStateOf(7) }
-    var showEndDialog by remember { mutableStateOf(false) } // 结束弹窗控制
+    var showEndDialog by remember { mutableStateOf(false) }
 
     val drankDays = remember(drankDaysStr) {
         if (drankDaysStr.isEmpty()) emptySet() else drankDaysStr.split(",").map { it.toInt() }.toSet()
@@ -77,7 +67,6 @@ fun AbstinenceTracker(
     val isTodayDrank = drankDays.contains(todayDiff)
 
     Column(modifier = modifier.fillMaxWidth()) {
-        // 标题和齿轮按钮
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -89,7 +78,6 @@ fun AbstinenceTracker(
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f)
             )
-            // 只有在第一层页面才显示齿轮按钮
             IconButton(onClick = onOpenSettings) {
                 Icon(
                     imageVector = Icons.Default.Settings,
@@ -109,9 +97,14 @@ fun AbstinenceTracker(
                     .padding(20.dp)
             ) {
                 Column {
-                    Text("设一个连续天数，从今天开始", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium,
+                    Text(
+                        text = "设一个连续天数，从今天开始",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center)
+                        textAlign = TextAlign.Center
+                    )
                     Spacer(Modifier.height(20.dp))
                     Box(
                         modifier = Modifier
@@ -129,6 +122,7 @@ fun AbstinenceTracker(
                                     .putLong("start_date", System.currentTimeMillis())
                                     .putString("drank_days", "")
                                     .apply()
+                                updateWidget(context) // 刷新小组件
                             }
                             .padding(vertical = 14.dp),
                         contentAlignment = Alignment.Center
@@ -151,7 +145,6 @@ fun AbstinenceTracker(
                     Text("选择目标", color = Color.Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(12.dp))
                     val goals = listOf(3, 7, 15, 21, 30)
-                    // 允许横向滑动，保证所有选项在一行
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -189,7 +182,7 @@ fun AbstinenceTracker(
                             modifier = Modifier
                                 .clip(CircleShape)
                                 .background(Color.White)
-                                .clickable { showEndDialog = true } // 点击显示弹窗
+                                .clickable { showEndDialog = true }
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Text("结束", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -244,9 +237,9 @@ fun AbstinenceTracker(
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 10.dp)) {
                             rowList.forEach { dayIndex ->
                                 val circleColor = when {
-                                    drankDays.contains(dayIndex) -> Color(0xFFF2A54A) // 橙
-                                    dayIndex <= todayDiff -> Color(0xFF52D17C) // 绿
-                                    else -> Color(0xFFF2F2F2) // 灰
+                                    drankDays.contains(dayIndex) -> Color(0xFFF2A54A)
+                                    dayIndex <= todayDiff -> Color(0xFF52D17C)
+                                    else -> Color(0xFFF2F2F2)
                                 }
                                 Box(
                                     modifier = Modifier
@@ -274,7 +267,6 @@ fun AbstinenceTracker(
                 StatBox("已连续", "${validStreak} 天", Modifier.weight(1f))
                 StatBox("累计不喝", "${(todayDiff + 1) - drankDays.size} 天", Modifier.weight(1f))
                 
-                // 去掉了年份，格式变为 MM-dd
                 val dateStr = SimpleDateFormat("MM-dd", Locale.CHINA).format(Date(startDate))
                 StatBox("开始于", dateStr, Modifier.weight(1f))
             }
@@ -294,7 +286,7 @@ fun AbstinenceTracker(
                         val newDrankDays = if (isTodayDrank) drankDays - todayDiff else drankDays + todayDiff
                         drankDaysStr = newDrankDays.joinToString(",")
                         prefs.edit().putString("drank_days", drankDaysStr).apply()
-                        updateWidget(context)
+                        updateWidget(context) // 刷新小组件
                     }
                     .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center
@@ -309,7 +301,6 @@ fun AbstinenceTracker(
         }
     }
 
-    // 结束确认弹窗
     if (showEndDialog) {
         Dialog(onDismissRequest = { showEndDialog = false }) {
             Box(
@@ -353,7 +344,7 @@ fun AbstinenceTracker(
                                 .clickable {
                                     isTracking = false
                                     prefs.edit().putBoolean("is_tracking", false).apply()
-                                    updateWidget(context)
+                                    updateWidget(context) // 刷新小组件
                                     showEndDialog = false
                                 }
                                 .padding(vertical = 14.dp),
@@ -365,6 +356,21 @@ fun AbstinenceTracker(
                 }
             }
         }
+    }
+}
+
+// ================== 下面是工具函数和小组件刷新逻辑 ==================
+
+private fun updateWidget(context: Context) {
+    val manager = AppWidgetManager.getInstance(context)
+    val component = ComponentName(context, AbstinenceWidget::class.java)
+    val ids = manager.getAppWidgetIds(component)
+    if (ids.isNotEmpty()) {
+        val intent = Intent(context, AbstinenceWidget::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        }
+        context.sendBroadcast(intent)
     }
 }
 
@@ -404,7 +410,7 @@ private fun StatBox(title: String, value: String, modifier: Modifier = Modifier)
             .clip(RoundedCornerShape(16.dp))
             .background(Color.White)
             .padding(horizontal = 12.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally // 👈 强制内容居中
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = title, 
