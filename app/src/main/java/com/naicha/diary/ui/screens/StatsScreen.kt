@@ -249,7 +249,7 @@ private fun IntervalCards(items: List<Drink>) {
             Text("距离上次喝奶茶已经\n${lastDrinkDays} 天", fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp)
         }
         Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
-            Text("本月平均每 ${avgDays} 天喝\n一杯", fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp)
+            Text("平均每 ${avgDays} 天喝\n一杯", fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp)
         }
     }
 }
