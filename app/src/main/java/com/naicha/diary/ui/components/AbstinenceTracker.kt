@@ -94,7 +94,9 @@ fun AbstinenceTracker(
                     .padding(20.dp)
             ) {
                 Column {
-                    Text("设一个连续天数，从今天开始", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                    Text("设一个连续天数，从今天开始", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center)
                     Spacer(Modifier.height(20.dp))
                     Box(
                         modifier = Modifier
@@ -384,10 +386,22 @@ private fun StatBox(title: String, value: String, modifier: Modifier = Modifier)
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .background(Color.White)
-            .padding(horizontal = 12.dp, vertical = 16.dp)
+            .padding(horizontal = 12.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally // 👈 强制内容居中
     ) {
-        Text(text = title, color = Color.Gray, fontSize = 12.sp)
+        Text(
+            text = title, 
+            color = Color.Gray, 
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center
+        )
         Spacer(Modifier.height(4.dp))
-        Text(text = value, color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = value, 
+            color = Color.Black, 
+            fontSize = 16.sp, 
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
     }
 }
