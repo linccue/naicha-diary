@@ -220,7 +220,11 @@ fun HomeScreen(
                             DropdownMenu(
                                 expanded = showSortMenu,
                                 onDismissRequest = { showSortMenu = false },
-                                modifier = Modifier.background(Color.Transparent),
+                                // 👇 加上这三个参数，把系统自带的底板彻底消灭
+                                containerColor = Color.Transparent,
+                                tonalElevation = 0.dp,
+                                shadowElevation = 0.dp,
+                                modifier = Modifier.background(Color.Transparent)
                             ) {
                                 Column(
                                     modifier = Modifier
