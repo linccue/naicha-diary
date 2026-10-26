@@ -11,7 +11,7 @@
     android:paddingTop="0dp"
     android:paddingBottom="0dp">
 
-    <!-- ================= 左侧区域 ================= -->
+    <!-- 左侧区域 -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -19,14 +19,12 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <!-- 猫咪图片 -->
         <ImageView
             android:layout_width="38dp"
             android:layout_height="38dp"
             android:src="@drawable/widget_cat"
             android:scaleType="fitCenter" />
 
-        <!-- 左侧文字块（上下拆分） -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -34,7 +32,7 @@
             android:layout_marginStart="6dp"
             android:orientation="vertical">
 
-            <!-- 左上半部分：MONTH（固定高 18dp，居中对齐） -->
+            <!-- 上半：MONTH -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="18dp"
@@ -55,7 +53,7 @@
                     android:singleLine="true" />
             </LinearLayout>
 
-            <!-- 左下半部分：数字和“杯”（固定高 28dp，底部对齐） -->
+            <!-- 下半：杯数 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="28dp"
@@ -82,7 +80,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- ================= 中间竖线 ================= -->
+    <!-- 中间竖线 -->
     <TextView
         android:layout_width="1dp"
         android:layout_height="34dp"
@@ -91,25 +89,23 @@
         android:background="#E0E0E0"
         android:layout_gravity="center_vertical" />
 
-    <!-- ================= 右侧区域 ================= -->
+    <!-- 右侧区域 -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="6"
         android:orientation="vertical">
 
-        <!-- 右上半部分：绿点+日期（固定高 18dp，居中对齐） -->
+        <!-- 上半：日期 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="18dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
-            
             <TextView
                 android:layout_width="7dp"
                 android:layout_height="7dp"
                 android:background="@drawable/dot_green" />
-
             <TextView
                 android:id="@+id/tv_date"
                 android:layout_width="wrap_content"
@@ -121,18 +117,13 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- 右下半部分：品牌名称（固定高 28dp，底部对齐） -->
+        <!-- 下半：品牌名（为了和上方左对齐，直接加 13dp 的 paddingStart） -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="28dp"
             android:gravity="bottom"
-            android:orientation="horizontal">
-
-            <!-- 这里放一个 13dp 的透明占位块（7dp绿点 + 6dp margin = 13dp），完美实现左边起点对齐 -->
-            <View
-                android:layout_width="13dp"
-                android:layout_height="1dp" />
-
+            android:orientation="horizontal"
+            android:paddingStart="13dp">
             <TextView
                 android:id="@+id/tv_drink_name"
                 android:layout_width="wrap_content"
