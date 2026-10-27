@@ -10,13 +10,23 @@ enum class DrinkCategory(
     val badge: String,
     val accent: Long,
 ) {
-    Tea("茶饮", "茶", 0xFFC98A5B),
+    MilkTea("奶茶", "奶", 0xFFC98A5B),
+    FruitTea("果茶", "果", 0xFFE8A33D),
     Coffee("咖啡", "咖", 0xFF8B5E3C),
-    ;
+    LemonTea("柠檬茶", "柠", 0xFFF4B223),
+    PureTea("纯茶", "茶", 0xFF3B8C4E),
+    Bottled("瓶装", "瓶", 0xFF2E86DE),
+    Alcohol("酒类", "酒", 0xFF8E44AD),
+    Yogurt("酸奶", "酸", 0xFFE8A0BF),
+    Other("其他", "他", 0xFF95A5A6);
 
     companion object {
         fun of(label: String): DrinkCategory =
-            entries.firstOrNull { it.label == label } ?: Tea
+            entries.firstOrNull { it.label == label } ?: when(label) {
+                "茶饮" -> MilkTea // 兼容旧数据
+                "咖啡" -> Coffee   // 兼容旧数据
+                else -> MilkTea
+            }
     }
 }
 
