@@ -730,7 +730,7 @@ private fun EmptyHint(onRecord: () -> Unit) {
             liquidColor = Color(0xFFDCC7B4), 
             strawColor = Color(0xFFC9B5A3), 
             toppingCount = 3,
-            style = CupStyle.Regular // 👈 这里加上了
+            style = CupStyle.Tea// 👈 这里加上了
         )
         Spacer(Modifier.height(14.dp))
         Text(text = "还没有记录哦", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
