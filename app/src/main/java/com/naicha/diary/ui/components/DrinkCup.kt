@@ -1,122 +1,461 @@
 package com.naicha.diary.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import com.naicha.diary.data.DrinkCategory
+import com.naicha.diary.ui.theme.Caramel
+import com.naicha.diary.ui.theme.Outline
+import com.naicha.diary.ui.theme.Pearl
+import com.naicha.diary.ui.theme.Strawberry
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlin.random.Random
 
-enum class CupStyle { Regular, Tall, Short }
+enum class CupStyle { Tea, Coffee }
 
-fun cupStyleFor(category: DrinkCategory): CupStyle {
-    return when (category) {
-        DrinkCategory.Coffee, DrinkCategory.PureTea, DrinkCategory.Bottled -> CupStyle.Tall
-        else -> CupStyle.Regular
-    }
+// 👇 修复了这里的分类映射
+fun cupStyleFor(category: DrinkCategory): CupStyle = when (category) {
+    DrinkCategory.Coffee, DrinkCategory.PureTea, DrinkCategory.Bottled -> CupStyle.Coffee
+    else -> CupStyle.Tea
 }
 
 @Composable
 fun DrinkCup(
+    modifier: Modifier = Modifier,
+    liquidColor: Color = Caramel,
+    strawColor: Color = Strawberry,
+    toppingCount: Int = 6,
+    animated: Boolean = true,
+    style: CupStyle = CupStyle.Tea,
+) {
+    val phase = if (animated) {
+        val transition = rememberInfiniteTransition(label = "cup")
+        val value by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = (2 * PI).toFloat(),
+            animationSpec = infiniteRepeatable(tween(3400, easing = LinearEasing)),
+            label = "cupPhase",
+        )
+        value
+    } else {
+        0f
+    }
+
+    val dots = remember(toppingCount) {
+        val random = Random(toppingCount * 37 + 11)
+        List(toppingCount) {
+            Offset(random.nextFloat(), random.nextFloat()) to (0.028f + random.nextFloat() * 0.016f)
+        }
+    }
+
+    Canvas(modifier = modifier) {
+        when (style) {
+            CupStyle.Tea -> drawTeaCup(liquidColor, strawColor, dots, phase)
+            CupStyle.Coffee -> drawCoffeeCup(liquidColor, dots, phase)
+        }
+    }
+}
+
+// ── 茶饮杯 ────────────────────────────────────────────────────────
+
+private fun DrawScope.drawTeaCup(
     liquidColor: Color,
     strawColor: Color,
-    toppingCount: Int,
-    style: CupStyle,
-    modifier: Modifier = Modifier
+    pearls: List<Pair<Offset, Float>>,
+    phase: Float,
 ) {
-    Box(modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val strokeW = w * 0.06f
-            val blackColor = Color(0xFF1C1C1E)
+    val w = size.width
+    val h = size.height
+    val cx = w / 2f
+    val capTop = h * 0.20f
+    val rimY = h * 0.30f
+    val baseY = h * 0.95f
+    val topHalf = w * 0.31f
+    val botHalf = w * 0.235f
 
-            val cupW = if (style == CupStyle.Tall) w * 0.5f else w * 0.65f
-            val cupH = if (style == CupStyle.Short) h * 0.5f else h * 0.65f
-            val startX = (w - cupW) / 2f
-            val startY = h * 0.25f
+    drawGlow(cx, h * 0.55f, w * 0.62f, liquidColor)
+    drawStraw(cx, topHalf, h, rimY, strawColor, phase)
+    drawTumblerBody(cx, rimY, baseY, topHalf, botHalf)
 
-            // 1. 吸管
-            val strawPath = Path().apply {
-                moveTo(startX + cupW * 0.5f, startY + cupH * 0.3f)
-                lineTo(startX + cupW * 0.8f, h * 0.05f)
-            }
-            drawPath(
-                path = strawPath,
-                color = strawColor,
-                style = Stroke(width = strokeW * 2f, cap = StrokeCap.Round)
-            )
+    val liquidTop = rimY + (baseY - rimY) * 0.40f
+    val liquidPath = taperPath(cx, rimY, baseY, topHalf, botHalf, w * 0.018f, liquidTop)
+    drawLiquid(liquidPath, liquidTop, liquidColor, phase)
 
-            // 2. 液体
-            val liquidPath = Path().apply {
-                moveTo(startX + cupW * 0.05f, startY + cupH * 0.35f)
-                lineTo(startX + cupW * 0.95f, startY + cupH * 0.35f)
-                lineTo(startX + cupW * 0.85f, startY + cupH)
-                lineTo(startX + cupW * 0.15f, startY + cupH)
-                close()
-            }
-            drawPath(path = liquidPath, color = liquidColor)
+    clipPath(liquidPath) {
+        drawPearls(cx, rimY, baseY, topHalf, botHalf, pearls, phase)
+    }
 
-            // 3. 珍珠
-            val pearlCount = toppingCount.coerceIn(1, 6)
-            for (i in 0 until pearlCount) {
-                val px = startX + cupW * (0.25f + (i % 3) * 0.25f)
-                val py = startY + cupH * (0.75f + (i / 3) * 0.15f)
-                drawCircle(color = blackColor.copy(alpha = 0.7f), radius = w * 0.04f, center = Offset(px, py))
-            }
+    drawHighlight(cx, rimY, baseY, topHalf, botHalf)
+    drawFlatCap(cx, capTop, rimY, topHalf)
+    drawBaseShadow(cx, baseY, botHalf)
+    drawSteam(cx, capTop, h, phase)
+}
 
-            // 4. 杯身轮廓
-            val cupOutlinePath = Path().apply {
-                moveTo(startX, startY)
-                lineTo(startX + cupW, startY)
-                lineTo(startX + cupW * 0.85f, startY + cupH - w * 0.05f)
-                quadraticBezierTo(startX + cupW * 0.85f, startY + cupH, startX + cupW * 0.85f - w * 0.05f, startY + cupH)
-                lineTo(startX + cupW * 0.15f + w * 0.05f, startY + cupH)
-                quadraticBezierTo(startX + cupW * 0.15f, startY + cupH, startX + cupW * 0.15f, startY + cupH - w * 0.05f)
-                close()
-            }
-            drawPath(
-                path = cupOutlinePath,
-                color = blackColor,
-                style = Stroke(width = strokeW, join = StrokeJoin.Round)
-            )
+// ── 咖啡杯 ────────────────────────────────────────────────────────
 
-            // 5. 杯盖
-            val lidW = cupW * 1.1f
-            val lidH = h * 0.12f
-            val lidX = startX - cupW * 0.05f
-            val lidY = startY - lidH * 0.8f
-            drawRoundRect(
-                color = blackColor,
-                topLeft = Offset(lidX, lidY),
-                size = Size(lidW, lidH),
-                cornerRadius = CornerRadius(lidH / 2, lidH / 2)
-            )
-            drawRoundRect(
-                color = blackColor,
-                topLeft = Offset(lidX + lidW * 0.15f, lidY - lidH * 0.4f),
-                size = Size(lidW * 0.7f, lidH * 0.8f),
-                cornerRadius = CornerRadius(lidH / 2, lidH / 2)
-            )
-            
-            // 高光
-            val highlightPath = Path().apply {
-                moveTo(startX + cupW * 0.2f, startY + cupH * 0.45f)
-                lineTo(startX + cupW * 0.2f, startY + cupH * 0.65f)
-            }
-            drawPath(
-                path = highlightPath,
-                color = Color.White.copy(alpha = 0.6f),
-                style = Stroke(width = strokeW * 1.5f, cap = StrokeCap.Round)
+private fun DrawScope.drawCoffeeCup(
+    liquidColor: Color,
+    bubbles: List<Pair<Offset, Float>>,
+    phase: Float,
+) {
+    val w = size.width
+    val h = size.height
+    val cx = w / 2f
+    val lidTop = h * 0.18f
+    val rimY = h * 0.31f
+    val baseY = h * 0.92f
+    val topHalf = w * 0.30f
+    val botHalf = w * 0.225f
+
+    drawGlow(cx, h * 0.52f, w * 0.60f, liquidColor)
+
+    val radius = botHalf * 0.34f
+    val body = Path().apply {
+        moveTo(cx - topHalf, rimY)
+        lineTo(cx + topHalf, rimY)
+        lineTo(cx + botHalf, baseY - radius)
+        quadraticTo(cx + botHalf, baseY, cx + botHalf - radius, baseY)
+        lineTo(cx - botHalf + radius, baseY)
+        quadraticTo(cx - botHalf, baseY, cx - botHalf, baseY - radius)
+        close()
+    }
+    drawPath(
+        body,
+        Brush.horizontalGradient(
+            listOf(Color(0xFFF1EDE8), Color.White, Color(0xFFFBF8F4), Color(0xFFEAE3DA)),
+        ),
+    )
+
+    val liquidTop = rimY + (baseY - rimY) * 0.26f
+    val liquidPath = taperPath(cx, rimY, baseY, topHalf, botHalf, w * 0.020f, liquidTop)
+    clipPath(liquidPath) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                listOf(liquidColor.copy(alpha = 0.80f), liquidColor, liquidColor.copy(alpha = 0.90f)),
+            ),
+            topLeft = Offset(cx - topHalf, liquidTop),
+            size = Size(topHalf * 2f, baseY - liquidTop),
+        )
+    }
+
+    val foamY = liquidTop
+    clipPath(liquidPath) {
+        drawRect(
+            color = Color.White.copy(alpha = 0.55f),
+            topLeft = Offset(cx - topHalf, foamY),
+            size = Size(topHalf * 2f, h * 0.035f),
+        )
+        bubbles.take(5).forEachIndexed { index, (unit, factor) ->
+            val r = w * factor * 0.9f
+            val bob = sin(phase + index) * h * 0.006f
+            drawCircle(
+                color = Color.White.copy(alpha = 0.42f),
+                radius = r,
+                center = Offset(
+                    cx + (unit.x - 0.5f) * topHalf * 1.4f,
+                    foamY + h * 0.05f + unit.y * h * 0.12f + bob,
+                ),
             )
         }
+    }
+
+    drawPath(body, Outline.copy(alpha = 0.9f), style = Stroke(width = w * 0.009f))
+
+    val sleeveTop = rimY + (baseY - rimY) * 0.34f
+    val sleeveBottom = rimY + (baseY - rimY) * 0.78f
+    val sleevePath = Path().apply {
+        val tHalf = topHalf + (botHalf - topHalf) * ((sleeveTop - rimY) / (baseY - rimY))
+        val bHalf = topHalf + (botHalf - topHalf) * ((sleeveBottom - rimY) / (baseY - rimY))
+        moveTo(cx - tHalf, sleeveTop)
+        lineTo(cx + tHalf, sleeveTop)
+        lineTo(cx + bHalf, sleeveBottom)
+        lineTo(cx - bHalf, sleeveBottom)
+        close()
+    }
+    drawPath(
+        sleevePath,
+        Brush.verticalGradient(
+            listOf(liquidColor.copy(alpha = 0.30f), liquidColor.copy(alpha = 0.42f)),
+        ),
+    )
+    drawPath(sleevePath, liquidColor.copy(alpha = 0.35f), style = Stroke(width = w * 0.006f))
+
+    drawHighlight(cx, rimY, baseY, topHalf, botHalf)
+
+    val lidHalf = topHalf + w * 0.032f
+    val lidHeight = (rimY - lidTop).coerceAtLeast(h * 0.07f)
+    val lidRadius = lidHeight * 0.34f
+    drawRoundRect(
+        brush = Brush.verticalGradient(listOf(Color(0xFFFFFDFA), Color(0xFFF2E7D8))),
+        topLeft = Offset(cx - lidHalf, lidTop),
+        size = Size(lidHalf * 2f, lidHeight),
+        cornerRadius = CornerRadius(lidRadius, lidRadius),
+    )
+    drawRoundRect(
+        color = Outline.copy(alpha = 0.9f),
+        topLeft = Offset(cx - lidHalf, lidTop),
+        size = Size(lidHalf * 2f, lidHeight),
+        cornerRadius = CornerRadius(lidRadius, lidRadius),
+        style = Stroke(width = w * 0.009f),
+    )
+    drawOval(
+        color = Color(0xFFDCCBB6),
+        topLeft = Offset(cx + lidHalf * 0.18f, lidTop + lidHeight * 0.22f),
+        size = Size(lidHalf * 0.52f, lidHeight * 0.34f),
+    )
+
+    drawBaseShadow(cx, baseY, botHalf)
+    drawSteam(cx, lidTop, h, phase)
+}
+
+// ── 通用绘制 ──────────────────────────────────────────────────────
+
+private fun taperPath(
+    cx: Float,
+    rimY: Float,
+    baseY: Float,
+    topHalf: Float,
+    botHalf: Float,
+    inset: Float,
+    top: Float,
+): Path {
+    val radius = botHalf * 0.30f
+    return Path().apply {
+        moveTo(cx - topHalf + inset, top)
+        lineTo(cx + topHalf - inset, top)
+        lineTo(cx + botHalf - inset, baseY - inset - radius)
+        quadraticTo(cx + botHalf - inset, baseY - inset, cx + botHalf - inset - radius, baseY - inset)
+        lineTo(cx - botHalf + inset + radius, baseY - inset)
+        quadraticTo(cx - botHalf + inset, baseY - inset, cx - botHalf + inset, baseY - inset - radius)
+        close()
+    }
+}
+
+private fun DrawScope.drawLiquid(path: Path, top: Float, color: Color, phase: Float) {
+    drawPath(
+        path,
+        Brush.verticalGradient(
+            listOf(color.copy(alpha = 0.72f), color, color.copy(alpha = 0.88f)),
+        ),
+    )
+    drawPath(path, color.copy(alpha = 0.55f), style = Stroke(width = size.width * 0.006f))
+    val wave = sin(phase * 1.6f) * size.height * 0.005f
+    drawRect(
+        color = Color.White.copy(alpha = 0.26f),
+        topLeft = Offset(0f, top + wave),
+        size = Size(size.width, size.height * 0.020f),
+    )
+}
+
+private fun DrawScope.drawGlow(cx: Float, cy: Float, radius: Float, color: Color) {
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(color.copy(alpha = 0.22f), color.copy(alpha = 0f)),
+            center = Offset(cx, cy),
+            radius = radius,
+        ),
+        radius = radius,
+        center = Offset(cx, cy),
+    )
+}
+
+private fun DrawScope.drawStraw(
+    cx: Float,
+    topHalf: Float,
+    h: Float,
+    rimY: Float,
+    strawColor: Color,
+    phase: Float,
+) {
+    val topX = cx + topHalf * 0.42f
+    val bottomX = cx + topHalf * 0.06f
+    val topY = h * 0.015f
+    val width = size.width * 0.072f
+    val wobble = sin(phase) * size.width * 0.006f
+
+    val path = Path().apply {
+        moveTo(topX - width / 2f + wobble, topY)
+        lineTo(topX + width / 2f + wobble, topY)
+        lineTo(bottomX + width / 2f, rimY + h * 0.06f)
+        lineTo(bottomX - width / 2f, rimY + h * 0.06f)
+        close()
+    }
+    drawPath(path, strawColor)
+    drawPath(
+        path = Path().apply {
+            moveTo(topX - width / 2f + wobble, topY)
+            lineTo(topX - width / 6f + wobble, topY)
+            lineTo(bottomX - width / 6f, rimY + h * 0.06f)
+            lineTo(bottomX - width / 2f, rimY + h * 0.06f)
+            close()
+        },
+        color = Color.White.copy(alpha = 0.35f),
+    )
+    drawPath(path, Color.Black.copy(alpha = 0.06f), style = Stroke(width = size.width * 0.006f))
+}
+
+private fun DrawScope.drawTumblerBody(
+    cx: Float,
+    rimY: Float,
+    baseY: Float,
+    topHalf: Float,
+    botHalf: Float,
+) {
+    val radius = botHalf * 0.34f
+    val path = Path().apply {
+        moveTo(cx - topHalf, rimY)
+        lineTo(cx + topHalf, rimY)
+        lineTo(cx + botHalf, baseY - radius)
+        quadraticTo(cx + botHalf, baseY, cx + botHalf - radius, baseY)
+        lineTo(cx - botHalf + radius, baseY)
+        quadraticTo(cx - botHalf, baseY, cx - botHalf, baseY - radius)
+        close()
+    }
+    drawPath(
+        path = path,
+        brush = Brush.horizontalGradient(
+            colors = listOf(
+                Color(0xFFF3F0EC), Color.White, Color(0xFFFBF8F4), Color(0xFFEDE7E0),
+            ),
+        ),
+    )
+    drawPath(path, Outline.copy(alpha = 0.9f), style = Stroke(width = size.width * 0.009f))
+}
+
+private fun DrawScope.drawPearls(
+    cx: Float,
+    rimY: Float,
+    baseY: Float,
+    topHalf: Float,
+    botHalf: Float,
+    pearls: List<Pair<Offset, Float>>,
+    phase: Float,
+) {
+    val areaTop = rimY + (baseY - rimY) * 0.58f
+    val areaBottom = baseY - size.height * 0.035f
+    val areaHeight = areaBottom - areaTop
+
+    pearls.forEachIndexed { index, (unit, radiusFactor) ->
+        val radius = size.width * radiusFactor
+        val bob = sin(phase + index * 0.9f) * size.height * 0.008f
+        val y = areaTop + unit.y * areaHeight + bob
+        val spread = botHalf + (topHalf - botHalf) * ((baseY - y) / (baseY - rimY))
+        val x = cx + (unit.x - 0.5f) * (spread - radius) * 1.55f
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0xFF6B4F3D), Pearl),
+                center = Offset(x - radius * 0.3f, y - radius * 0.3f),
+                radius = radius * 1.5f,
+            ),
+            radius = radius,
+            center = Offset(x, y),
+        )
+        drawCircle(
+            color = Color.White.copy(alpha = 0.42f),
+            radius = radius * 0.26f,
+            center = Offset(x - radius * 0.34f, y - radius * 0.36f),
+        )
+    }
+}
+
+private fun DrawScope.drawHighlight(
+    cx: Float,
+    rimY: Float,
+    baseY: Float,
+    topHalf: Float,
+    botHalf: Float,
+) {
+    val path = Path().apply {
+        moveTo(cx - topHalf * 0.72f, rimY + size.height * 0.06f)
+        lineTo(cx - topHalf * 0.52f, rimY + size.height * 0.06f)
+        lineTo(cx - botHalf * 0.48f, baseY - size.height * 0.09f)
+        quadraticTo(
+            cx - botHalf * 0.60f, baseY - size.height * 0.03f,
+            cx - botHalf * 0.74f, baseY - size.height * 0.08f,
+        )
+        close()
+    }
+    drawPath(path, Color.White.copy(alpha = 0.55f))
+}
+
+private fun DrawScope.drawFlatCap(cx: Float, capTop: Float, rimY: Float, topHalf: Float) {
+    val capHalf = topHalf + size.width * 0.035f
+    val capHeight = (rimY - capTop).coerceAtLeast(size.height * 0.06f)
+    val radius = capHeight * 0.42f
+
+    drawRoundRect(
+        brush = Brush.verticalGradient(listOf(Color(0xFFFFFDFA), Color(0xFFF6EADB))),
+        topLeft = Offset(cx - capHalf, capTop),
+        size = Size(capHalf * 2f, capHeight),
+        cornerRadius = CornerRadius(radius, radius),
+    )
+    drawRoundRect(
+        color = Outline.copy(alpha = 0.9f),
+        topLeft = Offset(cx - capHalf, capTop),
+        size = Size(capHalf * 2f, capHeight),
+        cornerRadius = CornerRadius(radius, radius),
+        style = Stroke(width = size.width * 0.009f),
+    )
+    drawRoundRect(
+        color = Color(0xFFE8D6C0),
+        topLeft = Offset(cx - capHalf + size.width * 0.02f, capTop + capHeight * 0.70f),
+        size = Size(capHalf * 2f - size.width * 0.04f, capHeight * 0.24f),
+        cornerRadius = CornerRadius(radius * 0.5f, radius * 0.5f),
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = 0.6f),
+        radius = capHeight * 0.16f,
+        center = Offset(cx - capHalf * 0.55f, capTop + capHeight * 0.36f),
+    )
+}
+
+private fun DrawScope.drawBaseShadow(cx: Float, baseY: Float, botHalf: Float) {
+    drawOval(
+        brush = Brush.radialGradient(
+            colors = listOf(Color.Black.copy(alpha = 0.14f), Color.Transparent),
+            center = Offset(cx, baseY + size.height * 0.012f),
+            radius = botHalf * 1.5f,
+        ),
+        topLeft = Offset(cx - botHalf * 1.35f, baseY - size.height * 0.005f),
+        size = Size(botHalf * 2.7f, size.height * 0.045f),
+    )
+}
+
+private fun DrawScope.drawSteam(cx: Float, capTop: Float, h: Float, phase: Float) {
+    repeat(3) { index ->
+        val offset = sin(phase * 1.2f + index * 1.7f)
+        val x = cx - size.width * 0.10f + index * size.width * 0.10f + offset * size.width * 0.02f
+        val baseY = capTop - h * 0.03f
+        val length = h * 0.09f * (0.7f + 0.3f * sin(phase + index))
+        drawLine(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = 0.45f)),
+                startY = baseY - length,
+                endY = baseY,
+            ),
+            start = Offset(x, baseY - length),
+            end = Offset(x + offset * size.width * 0.02f, baseY),
+            strokeWidth = size.width * 0.022f,
+            cap = StrokeCap.Round,
+        )
     }
 }
