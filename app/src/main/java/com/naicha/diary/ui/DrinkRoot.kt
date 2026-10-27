@@ -227,7 +227,7 @@ fun DrinkRoot() {
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val scope = rememberCoroutineScope()
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F5F0)))) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F5F0))) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
