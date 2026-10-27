@@ -33,7 +33,7 @@ import kotlin.random.Random
 enum class CupStyle { Tea, Coffee }
 
 fun cupStyleFor(category: DrinkCategory): CupStyle = when (category) {
-    DrinkCategory.Tea -> CupStyle.Tea
+   DrinkCategory.MilkTea, DrinkCategory.FruitTea, DrinkCategory.LemonTea, DrinkCategory.PureTea, DrinkCategory.Bottled, DrinkCategory.Alcohol, DrinkCategory.Yogurt, DrinkCategory.Other ->
     DrinkCategory.Coffee -> CupStyle.Coffee
 }
 
