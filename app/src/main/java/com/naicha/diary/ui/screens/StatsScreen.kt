@@ -43,7 +43,13 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     val avgRating = if (total == 0) 0f else items.sumOf { it.rating }.toFloat() / total
 
     Box(modifier.fillMaxSize()) {
-        PearlField(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), count = 12, seed = 23)
+               PearlField(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF4F5F0)), // 👈 改这里
+            count = 12,
+            seed = 23
+        )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
