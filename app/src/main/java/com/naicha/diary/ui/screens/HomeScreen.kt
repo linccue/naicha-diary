@@ -612,19 +612,22 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(modifier = Modifier.size(68.dp)) {
+                Box(modifier = Modifier.size(68.dp), contentAlignment = Alignment.Center) {
                     if (tea.photoPath != null) {
                         LocalPhoto(
                             file = PhotoStore.fileOf(tea.photoPath),
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.size(60.dp)
                         )
                     } else {
-                        Image(
-                            painter = painterResource(id = getDrinkIconRes(tea)),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize().padding(6.dp),
-                            contentScale = ContentScale.Fit
+                        // 👇 这里直接调用那个高级的、会变色的动态杯子
+                        DrinkCup(
+                            modifier = Modifier.size(56.dp),
+                            liquidColor = Color(Catalog.colorOf(tea.brand)), // 提取品牌色
+                            strawColor = Color(0xFFE2A776), // 吸管颜色
+                            toppingCount = tea.toppings.size + 3,
+                            animated = false, // 列表里关掉动画省电
+                            style = cupStyleFor(tea.categoryType)
                         )
                     }
                     
@@ -636,7 +639,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                         squircle = Catalog.isSquircle(brand.name),
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .offset(x = 4.dp, y = 4.dp)
+                            .offset(x = 2.dp, y = 2.dp)
                     )
                 }
 
@@ -710,6 +713,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     }
                 }
             }
+            // 极细分割线
             Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Color(0xFFE0E0E0)))
         }
     }
