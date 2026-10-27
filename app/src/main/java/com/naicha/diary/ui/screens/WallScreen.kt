@@ -86,7 +86,7 @@ fun WallScreen(
         PearlField(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+               .background(Color(0xFFF4F5F0)),
             count = 16,
             seed = 11,
         )
