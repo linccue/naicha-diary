@@ -60,7 +60,7 @@ fun SettingsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color(0xFFF4F5F0),
         dragHandle = {
             Box(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
