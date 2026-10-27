@@ -612,25 +612,26 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // 左侧：图片 + 品牌 Logo
                 Box(modifier = Modifier.size(68.dp), contentAlignment = Alignment.Center) {
                     if (tea.photoPath != null) {
+                        // 1. 有抠图，显示抠图
                         LocalPhoto(
                             file = PhotoStore.fileOf(tea.photoPath),
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier.size(60.dp)
+                            modifier = Modifier.size(56.dp) // 固定大小
                         )
                     } else {
-                        // 👇 这里直接调用那个高级的、会变色的动态杯子
-                        DrinkCup(
-                            modifier = Modifier.size(56.dp),
-                            liquidColor = Color(Catalog.colorOf(tea.brand)), // 提取品牌色
-                            strawColor = Color(0xFFE2A776), // 吸管颜色
-                            toppingCount = tea.toppings.size + 3,
-                            animated = false, // 列表里关掉动画省电
-                            style = cupStyleFor(tea.categoryType)
+                        // 2. 没有抠图，显示对应品类的线稿图
+                        Image(
+                            painter = painterResource(id = getDrinkIconRes(tea)),
+                            contentDescription = null,
+                            modifier = Modifier.size(56.dp), // 固定大小
+                            contentScale = ContentScale.Fit
                         )
                     }
                     
+                    // 品牌 Logo 叠加在右下角
                     BrandBadge(
                         badge = brand.badge,
                         color = Color(brand.color),
@@ -645,6 +646,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
 
                 Spacer(Modifier.width(16.dp))
 
+                // 右侧：文字信息
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -713,7 +715,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     }
                 }
             }
-            // 极细分割线
+            // 分割线
             Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Color(0xFFE0E0E0)))
         }
     }
