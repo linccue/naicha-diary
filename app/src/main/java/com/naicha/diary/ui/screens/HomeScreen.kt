@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,10 +31,13 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.naicha.diary.R
 import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.Drink
 import com.naicha.diary.data.DrinkCategory
@@ -44,11 +48,11 @@ import com.naicha.diary.ui.components.DrinkCup
 import com.naicha.diary.ui.components.cupStyleFor
 import com.naicha.diary.ui.components.PearlField
 import com.naicha.diary.ui.components.RatingStars
-import com.naicha.diary.ui.components.SoftCard
 import com.naicha.diary.ui.theme.Caramel
 import com.naicha.diary.ui.theme.PearlSoft
 import com.naicha.diary.ui.theme.Strawberry
 import com.naicha.diary.ui.theme.Taro
+import com.naicha.diary.util.PhotoStore
 import com.naicha.diary.util.TimeUtil
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -131,10 +135,10 @@ fun HomeScreen(
     }
 
     Box(modifier.fillMaxSize()) {
-               PearlField(
+        PearlField(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF4F5F0)), // 👈 改这里
+                .background(Color(0xFFF4F5F0)), // 米灰色背景
             count = 14,
             seed = 3,
         )
@@ -222,7 +226,6 @@ fun HomeScreen(
                             DropdownMenu(
                                 expanded = showSortMenu,
                                 onDismissRequest = { showSortMenu = false },
-                                // 👇 加上这三个参数，把系统自带的底板彻底消灭
                                 containerColor = Color.Transparent,
                                 tonalElevation = 0.dp,
                                 shadowElevation = 0.dp,
@@ -352,7 +355,7 @@ fun HomeScreen(
                     TeaRow(
                         tea = tea,
                         onClick = { onOpenDetail(tea) },
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 5.dp),
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
                     )
                 }
             }
@@ -594,63 +597,122 @@ private fun ActionTile(title: String, subtitle: String, emoji: String, colors: L
     }
 }
 
+// ================= 全新极简列表项 =================
 @Composable
 private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val brand = Catalog.brandOf(tea.brand)
-    SoftCard(modifier = modifier, elevation = 4.dp, contentPadding = PaddingValues(0.dp)) {
-        BouncyBox(onClick = onClick) {
+    val displayName = tea.name.ifBlank { 
+        if (tea.categoryType == DrinkCategory.Coffee) "神秘咖啡" else "神秘饮品" 
+    }
+
+    BouncyBox(onClick = onClick, modifier = modifier) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                BrandBadge(
-                    badge = brand.badge,
-                    color = Color(brand.color),
-                    logo = brand.logo,
-                    squircle = Catalog.isSquircle(brand.name),
-                )
-                Spacer(Modifier.width(12.dp))
+                // 左侧图片与品牌
+                Box(modifier = Modifier.size(68.dp)) {
+                    if (tea.photoPath != null) {
+                        LocalPhoto(
+                            file = PhotoStore.fileOf(tea.photoPath),
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = getDrinkIconRes(tea)),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().padding(6.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                    
+                    BrandBadge(
+                        badge = brand.badge,
+                        color = Color(brand.color),
+                        size = 22.dp,
+                        logo = brand.logo,
+                        squircle = Catalog.isSquircle(brand.name),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 4.dp, y = 4.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(16.dp))
+
+                // 右侧文字
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = tea.brand.ifBlank { "未命名" },
+                            text = displayName,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            text = TimeUtil.dayLabel(tea.timestamp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Spacer(Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(Color(0xFFF4F5F0))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = TimeUtil.dayLabel(tea.timestamp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PearlSoft
+                            )
+                        }
                     }
-                    Spacer(Modifier.height(3.dp))
+                    
+                    Spacer(Modifier.height(2.dp))
                     Text(
-                        text = buildString {
-                            if (tea.name.isNotBlank()) append(tea.name)
-                            if (tea.cupSize.isNotBlank()) {
-                                if (isNotEmpty()) append(" · ")
-                                append(tea.cupSize)
-                            }
-                            if (tea.sugar.isNotBlank()) append(" · ${tea.sugar}")
-                        },
+                        text = tea.brand.ifBlank { "未知品牌" },
                         style = MaterialTheme.typography.bodyMedium,
                         color = PearlSoft,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    
                     Spacer(Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RatingStars(rating = tea.rating, starSize = 13.dp)
-                        Spacer(Modifier.weight(1f))
-                        if (tea.price > 0) {
-                            Text(text = "¥${formatMoney(tea.price)}", style = MaterialTheme.typography.labelLarge, color = Caramel)
+                    RatingStars(rating = tea.rating, starSize = 14.dp)
+                    
+                    val tags = mutableListOf<String>()
+                    if (tea.sugar.isNotBlank()) tags.add(tea.sugar)
+                    if (tea.ice.isNotBlank()) tags.add(tea.ice)
+                    if (tea.toppings.isNotEmpty()) tags.addAll(tea.toppings)
+
+                    if (tags.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            tags.forEach { tag ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .border(0.5.dp, Color(0xFFE0E0E0), RoundedCornerShape(50))
+                                        .background(Color.White)
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
+            // 极细分割线
+            Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Color(0xFFE0E0E0)))
         }
     }
 }
@@ -671,3 +733,32 @@ private fun EmptyHint(onRecord: () -> Unit) {
 
 fun formatMoney(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.CHINA, "%.1f", value)
+
+// ================= 智能图片识别逻辑 =================
+fun getDrinkIconRes(tea: Drink): Int {
+    val name = tea.name
+    val isHot = tea.ice.contains("热") || tea.ice.contains("常温")
+
+    if (name.contains("冰淇淋") || name.contains("雪糕") || name.contains("冰激凌")) return R.drawable.drink_ice_cream
+    if (name.contains("酒") || name.contains("微醺") || name.contains("啤酒")) return R.drawable.drink_alcohol
+    if (name.contains("瓶装") || name.contains("气泡水")) return R.drawable.drink_bottle
+    if (name.contains("柠檬")) return R.drawable.drink_lemon_tea
+    
+    if (name.contains("纯茶") || name.contains("单丛") || name.contains("乌龙") || name.contains("绿茶") || name.contains("红茶") || name.contains("普洱")) {
+        return R.drawable.drink_pure_tea
+    }
+    
+    if (name.contains("果茶") || name.contains("水果") || name.contains("多肉") || name.contains("满杯") || name.contains("葡萄") || name.contains("草莓") || name.contains("杨梅")) {
+        return R.drawable.drink_fruit_tea
+    }
+
+    if (tea.categoryType == DrinkCategory.Coffee) {
+        return if (isHot) R.drawable.drink_coffee_hot else R.drawable.drink_coffee_cold
+    }
+
+    if (name.contains("奶茶") || name.contains("奶盖") || name.contains("鲜奶") || name.contains("拿铁") || tea.categoryType == DrinkCategory.Tea) {
+        return if (isHot) R.drawable.drink_milk_tea_hot else R.drawable.drink_milk_tea_cold
+    }
+
+    return R.drawable.drink_general
+}
