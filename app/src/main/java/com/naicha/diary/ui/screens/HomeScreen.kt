@@ -131,8 +131,10 @@ fun HomeScreen(
     }
 
     Box(modifier.fillMaxSize()) {
-        PearlField(
-            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+               PearlField(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF4F5F0)), // 👈 改这里
             count = 14,
             seed = 3,
         )
