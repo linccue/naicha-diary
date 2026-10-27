@@ -727,7 +727,7 @@ private fun EmptyHint(onRecord: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        DrinkCup(modifier = Modifier.width(120.dp).height(150.dp), liquidColor = Color(0xFFDCC7B4), strawColor = Color(0xFFC9B5A3), toppingCount = 3)
+        DrinkCup(modifier = Modifier.width(120.dp).height(150.dp), liquidColor = Color(0xFFDCC7B4), strawColor = Color(0xFFC9B5A3), toppingCount = 3, style = CupStyle.Regular)
         Spacer(Modifier.height(14.dp))
         Text(text = "还没有记录哦", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(4.dp))
