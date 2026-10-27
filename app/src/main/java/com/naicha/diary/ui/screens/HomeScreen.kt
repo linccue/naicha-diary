@@ -295,7 +295,7 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            listOf("全部", "奶茶", "果茶", "咖啡", "柠檬茶", "纯茶", "瓶装", "酒类", "酸奶", "其他").forEach { cat ->
+                            listOf("全部", "奶茶", "果茶", "咖啡", "柠檬茶", "纯茶", "瓶装", "酒类", "酸奶").forEach { cat ->
                                 FilterChipCustom(
                                     text = cat,
                                     selected = selectedCategory == cat,
