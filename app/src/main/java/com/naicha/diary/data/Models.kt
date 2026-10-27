@@ -22,7 +22,7 @@ enum class DrinkCategory(
     companion object {
         fun of(label: String): DrinkCategory =
             entries.firstOrNull { it.label == label } ?: when(label) {
-                "茶饮" -> MilkTea // 兼容旧数据
+                "茶饮" -> MilkTea
                 "咖啡" -> Coffee
                 else -> Other
             }
@@ -59,30 +59,16 @@ data class Drink(
         ): Int {
             val base = when (category) {
                 DrinkCategory.Coffee, DrinkCategory.PureTea -> when (cupSize) {
-                    "小杯" -> 90
-                    "中杯" -> 150
-                    "大杯" -> 210
-                    else -> 260
+                    "小杯" -> 90; "中杯" -> 150; "大杯" -> 210; else -> 260
                 }
                 else -> when (cupSize) {
-                    "小杯" -> 180
-                    "中杯" -> 260
-                    "大杯" -> 340
-                    else -> 420
+                    "小杯" -> 180; "中杯" -> 260; "大杯" -> 340; else -> 420
                 }
             }
             val sugarFactor = when (sugar) {
-                "全糖" -> 1.30
-                "七分糖" -> 1.18
-                "半糖" -> 1.00
-                "三分糖" -> 0.86
-                "无糖" -> 0.72
-                else -> 1.0
+                "全糖" -> 1.30; "七分糖" -> 1.18; "半糖" -> 1.00; "三分糖" -> 0.86; "无糖" -> 0.72; else -> 1.0
             }
-            val toppingWeight = when (category) {
-                DrinkCategory.Coffee -> 38
-                else -> 45
-            }
+            val toppingWeight = if (category == DrinkCategory.Coffee) 38 else 45
             return (base * sugarFactor).toInt() + toppingCount * toppingWeight
         }
     }
@@ -93,11 +79,13 @@ data class Brand(
     val category: DrinkCategory,
     val color: Long,
     val badge: String,
-    val logo: Int? = null,
+    val logo: Int = R.drawable.logo_mixue // 默认给个图，防止报错
 )
 
 object Catalog {
-    // 你的品牌列表保留原样，不用动
+    // 糖度选项
+    val sugars = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖")
+
     val brands: List<Brand> = listOf(
         // 茶饮
         Brand("蜜雪冰城", DrinkCategory.MilkTea, 0xFFE23A2E, "雪", R.drawable.logo_mixue),
@@ -158,13 +146,13 @@ object Catalog {
         // 咖啡
         Brand("瑞幸咖啡", DrinkCategory.Coffee, 0xFF1C3F94, "瑞", R.drawable.logo_luckin),
         Brand("星巴克", DrinkCategory.Coffee, 0xFF00704A, "星", R.drawable.logo_starbucks),
-        Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库", R.drawable.logo_cotti),
+        Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库"), // 修复缺失的 logo
         Brand("Manner", DrinkCategory.Coffee, 0xFFC59B5F, "M", R.drawable.logo_manner),
         Brand("M Stand", DrinkCategory.Coffee, 0xFF000000, "M", R.drawable.logo_mstand),
         Brand("Tims", DrinkCategory.Coffee, 0xFFD22630, "T", R.drawable.logo_tims),
         Brand("Peet's", DrinkCategory.Coffee, 0xFF1D4E4F, "P", R.drawable.logo_peets),
         Brand("挪瓦咖啡", DrinkCategory.Coffee, 0xFFEB6B2A, "挪", R.drawable.logo_nowwa),
-        Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸", R.drawable.logo_luckycup),
+        Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸"), // 修复缺失的 logo
         Brand("手冲 / 自制", DrinkCategory.Coffee, 0xFF8D6E63, "手"),
     )
 
@@ -189,7 +177,7 @@ object Catalog {
 
     fun sizesFor(category: DrinkCategory): List<String> = listOf("小杯", "中杯", "大杯", "超大杯")
     fun sugarOptions(category: DrinkCategory): List<String> = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖")
-    fun iceOptions(category: DrinkCategory): List<String> = if (category == DrinkCategory.Coffee || category == DrinkCategory.PureTea) listOf("热饮", "常温", "去冰", "少冰", "正常冰") else listOf("热饮", "常温", "去冰", "少冰", "正常冰", "多冰")
+    fun iceOptions(category: DrinkCategory): List<String> = listOf("热饮", "常温", "去冰", "少冰", "正常冰", "多冰")
     fun extraOptions(category: DrinkCategory): List<String> = if (category == DrinkCategory.Coffee) listOf("浓缩", "燕麦奶", "厚乳", "奶油顶") else listOf("珍珠", "椰果", "芋泥", "奶盖", "布丁", "西米")
 
     fun sugarLabel(category: DrinkCategory): String = "糖度"
