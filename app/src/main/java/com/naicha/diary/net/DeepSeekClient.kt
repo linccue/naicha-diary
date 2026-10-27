@@ -209,7 +209,7 @@ object DeepSeekClient {
             (obj[key] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
 
         val category = DrinkCategory.entries
-            .firstOrNull { it.label == str("category") } ?: DrinkCategory.Tea
+            .firstOrNull { it.label == str("category") } ?: DrinkCategory.MilkTea
 
         val toppings = (obj["toppings"] as? JsonArray)
             ?.mapNotNull { (it as? JsonPrimitive)?.content?.trim() }
