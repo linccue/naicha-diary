@@ -57,7 +57,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                 }
             }
 
-            // === 顶部 6 个质感小卡片 ===
+            // === 顶部 6 个极简数据卡片 ===
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatPill(label = "总杯数", value = total.toString(), accent = Caramel, modifier = Modifier.weight(1f))
@@ -75,7 +75,6 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
             }
 
             if (total > 0) {
-                // === 下方的所有数据卡片 ===
                 item {
                     SoftCard {
                         SectionHeader(title = "品牌分布", subtitle = "喝得最多的那几家")
@@ -90,7 +89,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                         Spacer(Modifier.height(14.dp))
                         PreferenceBars(
                             entries = Catalog.sugars.map { sugar -> sugar to items.count { it.sugar == sugar } },
-                            colors = listOf(Strawberry, Color(0xFFF2B04A), Caramel, Matcha, Sky),
+                            colors = emptyList() // 颜色不再依赖外部传入，直接内部写死极简色
                         )
                     }
                 }
@@ -127,7 +126,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     }
 }
 
-// ================= 高级质感数据卡片 =================
+// ================= 高级极简质感数据卡片 =================
 @Composable
 fun StatPill(
     label: String,
@@ -137,28 +136,31 @@ fun StatPill(
 ) {
     Column(
         modifier = modifier
-            .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(18.dp),
-                ambientColor = accent.copy(alpha = 0.25f),
-                spotColor = accent.copy(alpha = 0.25f)
-            )
-            .clip(RoundedCornerShape(18.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color.White, accent.copy(alpha = 0.06f))
-                )
-            )
-            .border(0.8.dp, accent.copy(alpha = 0.15f), RoundedCornerShape(18.dp))
-            .padding(horizontal = 10.dp, vertical = 14.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White)
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(0.05f), spotColor = Color.Black.copy(0.05f))
+            .padding(horizontal = 14.dp, vertical = 16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accent))
-            Spacer(Modifier.width(5.dp))
-            Text(text = label, color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            // 使用荧光黄绿作为唯一的小点缀
+            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFCBFF00)))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = label,
+                color = Color(0xFF888888),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
+            )
         }
-        Spacer(Modifier.height(10.dp))
-        Text(text = value, color = Color(0xFF1E1E1E), fontSize = 22.sp, fontWeight = FontWeight.Black, maxLines = 1)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = value,
+            color = Color.Black,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
     }
 }
 
@@ -208,7 +210,8 @@ private fun WeekRhythmCard(items: List<Drink>) {
             drawPath(path = path, color = Color.Black, style = Stroke(width = 6f, cap = StrokeCap.Round))
             
             points.forEach { point ->
-                drawCircle(color = Color(0xFFCCFF00), radius = 12f, center = point)
+                // 节点使用荧光黄绿
+                drawCircle(color = Color(0xFFCBFF00), radius = 12f, center = point)
                 drawCircle(color = Color.Black, radius = 12f, center = point, style = Stroke(width = 4f))
             }
         }
@@ -244,12 +247,28 @@ private fun IntervalCards(items: List<Drink>) {
         String.format("%.1f", daysInMonth.toFloat() / monthItems.size)
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
-            Text("距离上次喝奶茶已经\n${lastDrinkDays} 天", fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp)
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(
+            modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color.White).padding(16.dp)
+        ) {
+            Text("距离上次", color = Color(0xFF888888), fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("${lastDrinkDays}", color = Color.Black, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text(" 天", color = Color(0xFF888888), fontSize = 14.sp, modifier = Modifier.padding(bottom = 3.dp))
+            }
         }
-        Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
-            Text("平均每 ${avgDays} 天喝\n一杯", fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp)
+        
+        Column(
+            modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color.White).padding(16.dp)
+        ) {
+            // 去掉了“本月”两个字
+            Text("平均间隔", color = Color(0xFF888888), fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("${avgDays}", color = Color.Black, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text(" 天/杯", color = Color(0xFF888888), fontSize = 14.sp, modifier = Modifier.padding(bottom = 3.dp))
+            }
         }
     }
 }
@@ -305,7 +324,8 @@ private fun SpendingRankCard(items: List<Drink>) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(if (selected) Color(0xFFCCFF00) else Color.Transparent)
+                            // 选中状态使用荧光黄绿
+                            .background(if (selected) Color(0xFFCBFF00) else Color.Transparent)
                             .clickable { period = p }
                             .padding(horizontal = 12.dp, vertical = 4.dp)
                     ) {
@@ -323,7 +343,7 @@ private fun SpendingRankCard(items: List<Drink>) {
         Spacer(Modifier.height(16.dp))
         
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE8E9EB)), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFF0F0F0)), contentAlignment = Alignment.Center) {
                 Text("$", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black)
             }
             Spacer(Modifier.width(12.dp))
@@ -388,16 +408,45 @@ private fun BrandDonut(items: List<Drink>) {
 @Composable
 private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>) {
     val max = entries.maxOfOrNull { it.second }?.coerceAtLeast(1) ?: 1
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         entries.forEachIndexed { index, (label, count) ->
-            val color = colors[index % colors.size]
+            val isTop = count == max && count > 0
+            // 最高项使用荧光黄绿，其他使用极简灰色
+            val barColor = if (isTop) Color(0xFFCBFF00) else Color(0xFFE5E5E5)
+            val textColor = if (isTop) Color.Black else Color(0xFF888888)
+            
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.width(52.dp))
-                Box(modifier = Modifier.weight(1f).height(14.dp).clip(CircleShape).background(color.copy(alpha = 0.13f))) {
-                    Box(modifier = Modifier.fillMaxWidth((count.toFloat() / max).coerceIn(0.04f, 1f)).height(14.dp).clip(CircleShape).background(Brush.horizontalGradient(listOf(color, color.copy(alpha = 0.6f)))))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = textColor,
+                    fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.width(52.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(10.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF5F5F5))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth((count.toFloat() / max).coerceIn(0f, 1f))
+                            .fillMaxHeight()
+                            .clip(CircleShape)
+                            .background(barColor)
+                    )
                 }
-                Spacer(Modifier.width(9.dp))
-                Text(text = "$count", style = MaterialTheme.typography.labelMedium, color = PearlSoft, modifier = Modifier.width(24.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = textColor,
+                    fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.width(20.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                )
             }
         }
     }
@@ -466,14 +515,28 @@ private fun Achievements(items: List<Drink>, streak: Int) {
         Triple("🧭", "尝鲜达人", brandCount >= 5), Triple("🍬", "甜度全通", sugarCount >= 5),
         Triple("📷", "拍照记录", photoCount >= 5),
     )
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         badges.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { (emoji, label, unlocked) ->
-                    Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(if (unlocked) Caramel.copy(alpha = 0.13f) else MaterialTheme.colorScheme.surfaceContainerLow).padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = if (unlocked) emoji else "🔒", fontSize = 22.sp)
-                        Spacer(Modifier.height(5.dp))
-                        Text(text = label, style = MaterialTheme.typography.labelMedium, color = if (unlocked) Caramel else PearlSoft, fontWeight = if (unlocked) FontWeight.Bold else FontWeight.Normal)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            // 解锁的图标用极淡的荧光色打底
+                            .background(if (unlocked) Color(0xFFCBFF00).copy(alpha = 0.15f) else Color.Transparent)
+                            .border(if (unlocked) 0.dp else 1.dp, Color(0xFFEEEEEE), RoundedCornerShape(16.dp))
+                            .padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = if (unlocked) emoji else "🔒", fontSize = 24.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (unlocked) Color.Black else Color(0xFFBBBBBB),
+                            fontWeight = if (unlocked) FontWeight.Bold else FontWeight.Normal
+                        )
                     }
                 }
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
