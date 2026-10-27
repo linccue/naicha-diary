@@ -464,30 +464,27 @@ private fun CategorySwitcher(
             val selected = current == entry
             val accent = Color(entry.accent)
             val bg by animateColorAsState(if (selected) accent else Color.White, tween(320), label = "catBg")
-            val textColor = if (selected) Color.White else Color.DarkGray
+            val textColor = if (selected) Color.White else Color(0xFF4A4A4A)
 
-            Row(
+            Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(50))
                     .background(bg)
-                    .border(1.dp, if (selected) Color.Transparent else Color(0xFFE0E0E0), RoundedCornerShape(20.dp))
+                    .border(1.dp, if (selected) Color.Transparent else Color(0xFFE0E0E0), RoundedCornerShape(50))
                     .clickable { onSelect(entry) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Text(text = entry.badge, fontSize = 16.sp, color = textColor, fontWeight = FontWeight.Black)
-                Spacer(Modifier.width(6.dp))
                 Text(
                     text = entry.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = textColor,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 16.sp, 
+                    color = textColor, 
+                    fontWeight = FontWeight.Black // 延续原来的粗黑体
                 )
             }
         }
     }
 }
-
 @Composable private fun BrandChip(brand: Brand, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val color = Color(brand.color)
     Column(modifier = modifier.width(74.dp).clip(RoundedCornerShape(22.dp)).background(if (selected) color.copy(alpha = 0.12f) else Color.Transparent).border(if (selected) 2.dp else 0.dp, if (selected) color else Color.Transparent, RoundedCornerShape(22.dp)).clickable(onClick = onClick).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
