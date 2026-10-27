@@ -17,7 +17,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -43,13 +42,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     val avgRating = if (total == 0) 0f else items.sumOf { it.rating }.toFloat() / total
 
     Box(modifier.fillMaxSize()) {
-               PearlField(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF4F5F0)), // 👈 改这里
-            count = 12,
-            seed = 23
-        )
+        PearlField(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F5F0)), count = 12, seed = 23)
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -82,7 +75,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
 
             if (total > 0) {
                 item {
-                    SoftCard {
+                    StatsCard {
                         SectionHeader(title = "品牌分布", subtitle = "喝得最多的那几家")
                         Spacer(Modifier.height(14.dp))
                         BrandDonut(items = items)
@@ -90,18 +83,18 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                 }
 
                 item {
-                    SoftCard {
+                    StatsCard {
                         SectionHeader(title = "甜度偏好", subtitle = "你的甜度人格")
                         Spacer(Modifier.height(14.dp))
                         PreferenceBars(
                             entries = Catalog.sugars.map { sugar -> sugar to items.count { it.sugar == sugar } },
-                            colors = emptyList() // 颜色不再依赖外部传入，直接内部写死极简色
+                            colors = emptyList()
                         )
                     }
                 }
 
                 item {
-                    SoftCard {
+                    StatsCard {
                         SectionHeader(title = "本月日历", subtitle = "每天喝了几杯")
                         Spacer(Modifier.height(14.dp))
                         MonthHeatmap(items = items)
@@ -121,7 +114,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                 }
 
                 item {
-                    SoftCard {
+                    StatsCard {
                         SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
                         Spacer(Modifier.height(14.dp))
                         Achievements(items = items, streak = streak)
@@ -132,7 +125,20 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     }
 }
 
-// ================= 高级极简质感数据卡片 =================
+// ================= 专用的纯白卡片组件 =================
+@Composable
+fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.White) // 强制纯白背景 #FFFFFF
+            .padding(20.dp),
+        content = content
+    )
+}
+
+// ================= 顶部数据卡片 =================
 @Composable
 fun StatPill(
     label: String,
@@ -143,15 +149,15 @@ fun StatPill(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White)
+            .background(Color.White) // 强制纯白背景 #FFFFFF
             .shadow(elevation = 2.dp, shape = RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(0.05f), spotColor = Color.Black.copy(0.05f))
             .padding(horizontal = 14.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally // 👈 1. 让上下两部分整体居中
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center, // 👈 2. 让绿点和标题在行内居中
-            modifier = Modifier.fillMaxWidth() // 👈 3. 撑满宽度以支持居中
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
         ) {
             Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFCBFF00)))
             Spacer(Modifier.width(6.dp))
@@ -191,7 +197,7 @@ private fun WeekRhythmCard(items: List<Drink>) {
     val maxCount = weekData.maxOrNull()?.coerceAtLeast(1) ?: 1
     val labels = listOf("一", "二", "三", "四", "五", "六", "日")
 
-    SoftCard {
+    StatsCard {
         SectionHeader(title = "周节律", subtitle = "星期几最忍不住")
         Spacer(Modifier.height(24.dp))
         
@@ -220,7 +226,6 @@ private fun WeekRhythmCard(items: List<Drink>) {
             drawPath(path = path, color = Color.Black, style = Stroke(width = 6f, cap = StrokeCap.Round))
             
             points.forEach { point ->
-                // 节点使用荧光黄绿
                 drawCircle(color = Color(0xFFCBFF00), radius = 12f, center = point)
                 drawCircle(color = Color.Black, radius = 12f, center = point, style = Stroke(width = 4f))
             }
@@ -272,7 +277,6 @@ private fun IntervalCards(items: List<Drink>) {
         Column(
             modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color.White).padding(16.dp)
         ) {
-            // 去掉了“本月”两个字
             Text("平均间隔", color = Color(0xFF888888), fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.Bottom) {
@@ -321,12 +325,12 @@ private fun SpendingRankCard(items: List<Drink>) {
             .take(4)
     }
 
-    SoftCard {
+    StatsCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SectionHeader(title = "消费总额排行", subtitle = null, modifier = Modifier.weight(1f))
             
             Row(
-                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF4F5F7)).padding(4.dp),
+                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF4F5F0)).padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 listOf("周", "月", "年").forEach { p ->
@@ -334,7 +338,6 @@ private fun SpendingRankCard(items: List<Drink>) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            // 选中状态使用荧光黄绿
                             .background(if (selected) Color(0xFFCBFF00) else Color.Transparent)
                             .clickable { period = p }
                             .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -353,7 +356,7 @@ private fun SpendingRankCard(items: List<Drink>) {
         Spacer(Modifier.height(16.dp))
         
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFF0F0F0)), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFF4F5F0)), contentAlignment = Alignment.Center) {
                 Text("$", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black)
             }
             Spacer(Modifier.width(12.dp))
@@ -421,7 +424,6 @@ private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         entries.forEachIndexed { index, (label, count) ->
             val isTop = count == max && count > 0
-            // 最高项使用荧光黄绿，其他使用极简灰色
             val barColor = if (isTop) Color(0xFFCBFF00) else Color(0xFFE5E5E5)
             val textColor = if (isTop) Color.Black else Color(0xFF888888)
             
@@ -438,7 +440,7 @@ private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>
                         .weight(1f)
                         .height(10.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFF5F5F5))
+                        .background(Color(0xFFF4F5F0))
                 ) {
                     Box(
                         modifier = Modifier
@@ -533,8 +535,7 @@ private fun Achievements(items: List<Drink>, streak: Int) {
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(16.dp))
-                            // 解锁的图标用极淡的荧光色打底
-                            .background(if (unlocked) Color(0xFFCBFF00).copy(alpha = 0.15f) else Color.Transparent)
+                            .background(if (unlocked) Color(0xFFCBFF00).copy(alpha = 0.15f) else Color(0xFFF4F5F0))
                             .border(if (unlocked) 0.dp else 1.dp, Color(0xFFEEEEEE), RoundedCornerShape(16.dp))
                             .padding(vertical = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
