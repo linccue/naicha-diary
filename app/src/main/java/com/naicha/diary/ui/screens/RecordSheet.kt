@@ -99,7 +99,6 @@ fun RecordSheet(
 
     fun switchCategory(next: DrinkCategory) {
         category = next
-        if (brand.isNotBlank() && Catalog.brandOf(brand).category != next) brand = ""
         val sizes = Catalog.sizesFor(next)
         if (cupSize !in sizes) cupSize = sizes.getOrElse(1) { sizes.first() }
         val sugars = Catalog.sugarOptions(next)
@@ -240,7 +239,7 @@ fun RecordSheet(
                 item {
                     FieldGroup(title = "品牌", subtitle = "${Catalog.brandsOf(category).size} 个") {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Catalog.brandsOf(category).forEach { item ->
+                            Catalog.brands.forEach { item ->
                                 BrandChip(brand = item, selected = brand == item.name, onClick = { brand = item.name })
                             }
                         }
@@ -449,17 +448,41 @@ fun RecordSheet(
     }
 }
 
-// === 下面是抽离的组件和工具函数 (保持原样) ===
-@Composable private fun CategorySwitcher(current: DrinkCategory, onSelect: (DrinkCategory) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier = modifier.fillMaxWidth().shadow(10.dp, RoundedCornerShape(30.dp), ambientColor = Color(current.accent).copy(alpha = 0.35f), spotColor = Color(current.accent).copy(alpha = 0.35f)).clip(RoundedCornerShape(30.dp)).background(MaterialTheme.colorScheme.surface).border(0.8.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.15f))), RoundedCornerShape(30.dp)).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CategorySwitcher(
+    current: DrinkCategory,
+    onSelect: (DrinkCategory) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         DrinkCategory.entries.forEach { entry ->
             val selected = current == entry
             val accent = Color(entry.accent)
-            val bg by animateColorAsState(if (selected) accent else Color.Transparent, tween(320), label = "catBg")
-            Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(bg).clickable { onSelect(entry) }.padding(vertical = 15.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = entry.badge, fontSize = 23.sp, color = if (selected) Color.White else PearlSoft, fontWeight = FontWeight.Black)
-                Spacer(Modifier.height(3.dp))
-                Text(text = entry.label, style = MaterialTheme.typography.labelLarge, color = if (selected) Color.White else PearlSoft, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+            val bg by animateColorAsState(if (selected) accent else Color.White, tween(320), label = "catBg")
+            val textColor = if (selected) Color.White else Color.DarkGray
+
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(bg)
+                    .border(1.dp, if (selected) Color.Transparent else Color(0xFFE0E0E0), RoundedCornerShape(20.dp))
+                    .clickable { onSelect(entry) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = entry.badge, fontSize = 16.sp, color = textColor, fontWeight = FontWeight.Black)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = entry.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = textColor,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                )
             }
         }
     }
