@@ -70,7 +70,7 @@ fun RecordSheet(
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var category by remember { mutableStateOf(DrinkCategory.of(initial?.category ?: DrinkCategory.Tea.label)) }
+    var category by remember { mutableStateOf(DrinkCategory.of(initial?.category ?: DrinkCategory.MilkTea.label)) }
     var brand by remember { mutableStateOf(initial?.brand ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var cupSize by remember { mutableStateOf(initial?.cupSize ?: "中杯") }
