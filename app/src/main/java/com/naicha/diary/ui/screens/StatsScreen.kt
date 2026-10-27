@@ -87,7 +87,8 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                         SectionHeader(title = "甜度偏好", subtitle = "你的甜度人格")
                         Spacer(Modifier.height(14.dp))
                         PreferenceBars(
-                            entries = Catalog.sugars.map { sugar -> sugar to items.count { it.sugar == sugar } },
+                    entries = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖").map { sugar ->
+    sugar to items.count { it.sugar == sugar }},
                             colors = emptyList()
                         )
                     }
