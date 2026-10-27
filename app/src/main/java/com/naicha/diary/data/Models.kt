@@ -4,11 +4,7 @@ import com.naicha.diary.R
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
-enum class DrinkCategory(
-    val label: String,
-    val badge: String,
-    val accent: Long,
-) {
+enum class DrinkCategory(val label: String, val badge: String, val accent: Long) {
     MilkTea("奶茶", "奶", 0xFFC98A5B),
     FruitTea("果茶", "果", 0xFFE8A33D),
     Coffee("咖啡", "咖", 0xFF8B5E3C),
@@ -20,12 +16,7 @@ enum class DrinkCategory(
     Other("其他", "他", 0xFF95A5A6);
 
     companion object {
-        fun of(label: String): DrinkCategory =
-            entries.firstOrNull { it.label == label } ?: when(label) {
-                "茶饮" -> MilkTea
-                "咖啡" -> Coffee
-                else -> Other
-            }
+        fun of(label: String): DrinkCategory = entries.firstOrNull { it.label == label } ?: MilkTea
     }
 }
 
@@ -47,16 +38,10 @@ data class Drink(
     val timestamp: Long = System.currentTimeMillis(),
 ) {
     val categoryType: DrinkCategory get() = DrinkCategory.of(category)
-
     val calories: Int get() = estimateCalories(categoryType, cupSize, sugar, toppings.size)
 
     companion object {
-        private fun estimateCalories(
-            category: DrinkCategory,
-            cupSize: String,
-            sugar: String,
-            toppingCount: Int,
-        ): Int {
+        private fun estimateCalories(category: DrinkCategory, cupSize: String, sugar: String, toppingCount: Int): Int {
             val base = when (category) {
                 DrinkCategory.Coffee, DrinkCategory.PureTea -> when (cupSize) {
                     "小杯" -> 90; "中杯" -> 150; "大杯" -> 210; else -> 260
@@ -84,18 +69,22 @@ data class Brand(
 
 object Catalog {
     val sugars = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖")
+    val moods = listOf("😋", "😌", "🥰", "🥺", "😭", "😡", "🤩", "🤔", "😪", "💪")
 
     val brands: List<Brand> = listOf(
-        // 茶饮
         Brand("蜜雪冰城", DrinkCategory.MilkTea, 0xFFE23A2E, "雪", R.drawable.logo_mixue),
-                Brand("瑞幸咖啡", DrinkCategory.Coffee, 0xFF1C3F94, "瑞", R.drawable.logo_luckin),
-                Brand("陈文鼎", DrinkCategory.MilkTea, 0xFF8B4A2B, "陈", R.drawable.logo_chenwending),
+        Brand("霸王茶姬", DrinkCategory.MilkTea, 0xFF8E2F3F, "姬", R.drawable.logo_bawangchaji),
+        
+        // 👇 调整到靠前位置的三家品牌
         Brand("煲珠公", DrinkCategory.MilkTea, 0xFF3A3EC5, "煲", R.drawable.logo_baozhugong),
+        Brand("陈文鼎", DrinkCategory.MilkTea, 0xFF8B4A2B, "陈", R.drawable.logo_chenwending),
+        Brand("瑞幸咖啡", DrinkCategory.Coffee, 0xFF1C3F94, "瑞", R.drawable.logo_luckin),
+        
+        // 其他茶饮品牌
         Brand("古茗", DrinkCategory.MilkTea, 0xFF2B2B2B, "古", R.drawable.logo_guming),
         Brand("沪上阿姨", DrinkCategory.MilkTea, 0xFFC7303E, "沪", R.drawable.logo_hushangayi),
         Brand("茶百道", DrinkCategory.MilkTea, 0xFF2E86DE, "茶", R.drawable.logo_chabaidao),
         Brand("益禾堂", DrinkCategory.MilkTea, 0xFFD7263D, "益", R.drawable.logo_yihetang),
-        Brand("霸王茶姬", DrinkCategory.MilkTea, 0xFF8E2F3F, "姬", R.drawable.logo_bawangchaji),
         Brand("喜茶", DrinkCategory.MilkTea, 0xFF1C1C1E, "喜", R.drawable.logo_heytea),
         Brand("奈雪的茶", DrinkCategory.MilkTea, 0xFF7DBE3F, "奈", R.drawable.logo_naixue),
         Brand("茶颜悦色", DrinkCategory.MilkTea, 0xFF7B4A2D, "颜", R.drawable.logo_chayanyuese),
@@ -141,20 +130,19 @@ object Catalog {
         Brand("茉沏", DrinkCategory.MilkTea, 0xFF7F8C8D, "茉", R.drawable.logo_moqi),
         Brand("让茶", DrinkCategory.MilkTea, 0xFF27AE60, "让", R.drawable.logo_rangcha),
         Brand("真茶屋", DrinkCategory.MilkTea, 0xFF2ECC71, "真", R.drawable.logo_zhenchawu),
-    
         
-        // 咖啡
+        // 其他咖啡品牌
         Brand("星巴克", DrinkCategory.Coffee, 0xFF00704A, "星", R.drawable.logo_starbucks),
-        
- 
-        Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库", R.drawable.logo_luckin), 
+        Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库", R.drawable.logo_luckin),
         Brand("Manner", DrinkCategory.Coffee, 0xFFC59B5F, "M", R.drawable.logo_manner),
         Brand("M Stand", DrinkCategory.Coffee, 0xFF000000, "M", R.drawable.logo_mstand),
         Brand("Tims", DrinkCategory.Coffee, 0xFFD22630, "T", R.drawable.logo_tims),
         Brand("Peet's", DrinkCategory.Coffee, 0xFF1D4E4F, "P", R.drawable.logo_peets),
         Brand("挪瓦咖啡", DrinkCategory.Coffee, 0xFFEB6B2A, "挪", R.drawable.logo_nowwa),
-        Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸", R.drawable.logo_luckin) 
-         Brand("自制 / 其他", DrinkCategory.MilkTea, 0xFF8D6E63, "自", R.drawable.logo_mixue),
+        Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸", R.drawable.logo_luckin),
+        
+        // 👇 放在绝对最后的兜底品牌
+        Brand("自制 / 其他", DrinkCategory.MilkTea, 0xFF8D6E63, "自", R.drawable.logo_mixue)
     )
 
     val commonNames = mapOf(
@@ -169,18 +157,14 @@ object Catalog {
         DrinkCategory.Other to listOf("冰淇淋", "雪糕", "双皮奶")
     )
 
-    val moods = listOf("😋", "😌", "🥰", "🥺", "😭", "😡", "🤩", "🤔", "😪", "💪")
-
     fun brandsOf(category: DrinkCategory): List<Brand> = brands
     fun brandOf(name: String): Brand = brands.firstOrNull { it.name == name } ?: brands.last()
     fun colorOf(name: String): Long = brandOf(name).color
     fun isSquircle(name: String): Boolean = name in setOf("喜茶", "奈雪的茶", "霸王茶姬", "陈文鼎", "煲珠公")
-
     fun sizesFor(category: DrinkCategory): List<String> = listOf("小杯", "中杯", "大杯", "超大杯")
-    fun sugarOptions(category: DrinkCategory): List<String> = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖")
+    fun sugarOptions(category: DrinkCategory): List<String> = sugars
     fun iceOptions(category: DrinkCategory): List<String> = listOf("热饮", "常温", "去冰", "少冰", "正常冰", "多冰")
     fun extraOptions(category: DrinkCategory): List<String> = if (category == DrinkCategory.Coffee) listOf("浓缩", "燕麦奶", "厚乳", "奶油顶") else listOf("珍珠", "椰果", "芋泥", "奶盖", "布丁", "西米")
-
     fun sugarLabel(category: DrinkCategory): String = "糖度"
     fun iceLabel(category: DrinkCategory): String = "冰量 / 温度"
     fun extraLabel(category: DrinkCategory): String = "加料"
