@@ -1,6 +1,7 @@
 package com.naicha.diary.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import com.naicha.diary.ui.components.LocalPhoto
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -59,6 +60,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     items: List<Drink>,
@@ -90,14 +92,16 @@ fun HomeScreen(
     val monthSpend = monthItems.sumOf { it.price }
     val dateLabel = remember { SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date()) }
 
+    // 核心过滤逻辑
     val processedItems = remember(items, selectedCategory, sortOrder, searchQuery, activeQuickFilter) {
         var result = items
 
+        // 1. 按新品类筛选（直接匹配字符串）
         if (selectedCategory != "全部") {
-            val catLabel = if (selectedCategory == "茶饮") DrinkCategory.Tea.label else DrinkCategory.Coffee.label
-            result = result.filter { it.category == catLabel }
+            result = result.filter { it.category == selectedCategory }
         }
 
+        // 2. 按搜索词筛选
         if (searchQuery.isNotBlank()) {
             val q = searchQuery.trim()
             result = result.filter {
@@ -107,6 +111,7 @@ fun HomeScreen(
             }
         }
 
+        // 3. 快捷标签筛选
         when (activeQuickFilter) {
             "无限复购" -> {
                 val counts = items.groupingBy { it.brand + it.name }.eachCount()
@@ -125,6 +130,7 @@ fun HomeScreen(
             }
         }
 
+        // 4. 排序
         result = when (sortOrder) {
             "评分由高到低" -> result.sortedByDescending { it.rating }
             "时间顺序" -> result.sortedByDescending { it.timestamp }
@@ -138,7 +144,7 @@ fun HomeScreen(
         PearlField(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF4F5F0)), // 米灰色背景
+                .background(Color(0xFFF4F5F0)),
             count = 14,
             seed = 3,
         )
@@ -175,7 +181,7 @@ fun HomeScreen(
                 HeroCard(
                     monthCount = monthCount,
                     monthSpend = monthSpend,
-                    todayStyle = monthItems.maxByOrNull { it.timestamp }?.categoryType ?: DrinkCategory.Tea,
+                    todayStyle = monthItems.maxByOrNull { it.timestamp }?.categoryType ?: DrinkCategory.MilkTea,
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
                 )
             }
@@ -285,15 +291,16 @@ fun HomeScreen(
                         )
                     }
                     
+                    // 分类标签栏（更新为9个大类）
                     AnimatedVisibility(visible = showCategory) {
-                        Row(
+                        FlowRow(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 12.dp)
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(top = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            listOf("全部", "茶饮", "咖啡").forEach { cat ->
+                            listOf("全部", "奶茶", "果茶", "咖啡", "柠檬茶", "纯茶", "瓶装", "酒类", "酸奶", "其他").forEach { cat ->
                                 FilterChipCustom(
                                     text = cat,
                                     selected = selectedCategory == cat,
@@ -597,12 +604,12 @@ private fun ActionTile(title: String, subtitle: String, emoji: String, colors: L
     }
 }
 
-// ================= 全新极简列表项 =================
 @Composable
 private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val brand = Catalog.brandOf(tea.brand)
+    // 没写名字时，根据9大分类自动生成
     val displayName = tea.name.ifBlank { 
-        if (tea.categoryType == DrinkCategory.Coffee) "神秘咖啡" else "神秘饮品" 
+        if (tea.category == "咖啡") "神秘咖啡" else "神秘${tea.category}" 
     }
 
     BouncyBox(onClick = onClick, modifier = modifier) {
@@ -611,7 +618,6 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 左侧图片与品牌
                 Box(modifier = Modifier.size(68.dp)) {
                     if (tea.photoPath != null) {
                         LocalPhoto(
@@ -642,7 +648,6 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
 
                 Spacer(Modifier.width(16.dp))
 
-                // 右侧文字
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -711,7 +716,6 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     }
                 }
             }
-            // 极细分割线
             Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Color(0xFFE0E0E0)))
         }
     }
@@ -734,31 +738,19 @@ private fun EmptyHint(onRecord: () -> Unit) {
 fun formatMoney(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.CHINA, "%.1f", value)
 
-// ================= 智能图片识别逻辑 =================
+// 9大分类智能匹配图片
 fun getDrinkIconRes(tea: Drink): Int {
-    val name = tea.name
+    val category = DrinkCategory.of(tea.category)
     val isHot = tea.ice.contains("热") || tea.ice.contains("常温")
 
-    if (name.contains("冰淇淋") || name.contains("雪糕") || name.contains("冰激凌")) return R.drawable.drink_ice_cream
-    if (name.contains("酒") || name.contains("微醺") || name.contains("啤酒")) return R.drawable.drink_alcohol
-    if (name.contains("瓶装") || name.contains("气泡水")) return R.drawable.drink_bottle
-    if (name.contains("柠檬")) return R.drawable.drink_lemon_tea
-    
-    if (name.contains("纯茶") || name.contains("单丛") || name.contains("乌龙") || name.contains("绿茶") || name.contains("红茶") || name.contains("普洱")) {
-        return R.drawable.drink_pure_tea
+    return when (category) {
+        DrinkCategory.MilkTea -> if (isHot) R.drawable.drink_milk_tea_hot else R.drawable.drink_milk_tea_cold
+        DrinkCategory.Coffee -> if (isHot) R.drawable.drink_coffee_hot else R.drawable.drink_coffee_cold
+        DrinkCategory.FruitTea -> R.drawable.drink_fruit_tea
+        DrinkCategory.LemonTea -> R.drawable.drink_lemon_tea
+        DrinkCategory.PureTea -> R.drawable.drink_pure_tea
+        DrinkCategory.Bottled -> R.drawable.drink_bottle
+        DrinkCategory.Alcohol -> R.drawable.drink_alcohol
+        else -> R.drawable.drink_general // 酸奶和其他
     }
-    
-    if (name.contains("果茶") || name.contains("水果") || name.contains("多肉") || name.contains("满杯") || name.contains("葡萄") || name.contains("草莓") || name.contains("杨梅")) {
-        return R.drawable.drink_fruit_tea
-    }
-
-    if (tea.categoryType == DrinkCategory.Coffee) {
-        return if (isHot) R.drawable.drink_coffee_hot else R.drawable.drink_coffee_cold
-    }
-
-    if (name.contains("奶茶") || name.contains("奶盖") || name.contains("鲜奶") || name.contains("拿铁") || tea.categoryType == DrinkCategory.Tea) {
-        return if (isHot) R.drawable.drink_milk_tea_hot else R.drawable.drink_milk_tea_cold
-    }
-
-    return R.drawable.drink_general
 }
