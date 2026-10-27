@@ -1,7 +1,6 @@
 package com.naicha.diary.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import com.naicha.diary.ui.components.LocalPhoto
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -47,8 +46,10 @@ import com.naicha.diary.ui.components.BouncyBox
 import com.naicha.diary.ui.components.BrandBadge
 import com.naicha.diary.ui.components.DrinkCup
 import com.naicha.diary.ui.components.cupStyleFor
+import com.naicha.diary.ui.components.CupStyle // 👈 加上了这行
 import com.naicha.diary.ui.components.PearlField
 import com.naicha.diary.ui.components.RatingStars
+import com.naicha.diary.ui.components.LocalPhoto
 import com.naicha.diary.ui.theme.Caramel
 import com.naicha.diary.ui.theme.PearlSoft
 import com.naicha.diary.ui.theme.Strawberry
@@ -92,16 +93,13 @@ fun HomeScreen(
     val monthSpend = monthItems.sumOf { it.price }
     val dateLabel = remember { SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date()) }
 
-    // 核心过滤逻辑
     val processedItems = remember(items, selectedCategory, sortOrder, searchQuery, activeQuickFilter) {
         var result = items
 
-        // 1. 按新品类筛选（直接匹配字符串）
         if (selectedCategory != "全部") {
             result = result.filter { it.category == selectedCategory }
         }
 
-        // 2. 按搜索词筛选
         if (searchQuery.isNotBlank()) {
             val q = searchQuery.trim()
             result = result.filter {
@@ -111,7 +109,6 @@ fun HomeScreen(
             }
         }
 
-        // 3. 快捷标签筛选
         when (activeQuickFilter) {
             "无限复购" -> {
                 val counts = items.groupingBy { it.brand + it.name }.eachCount()
@@ -130,7 +127,6 @@ fun HomeScreen(
             }
         }
 
-        // 4. 排序
         result = when (sortOrder) {
             "评分由高到低" -> result.sortedByDescending { it.rating }
             "时间顺序" -> result.sortedByDescending { it.timestamp }
@@ -291,7 +287,6 @@ fun HomeScreen(
                         )
                     }
                     
-                    // 分类标签栏（更新为9个大类）
                     AnimatedVisibility(visible = showCategory) {
                         FlowRow(
                             modifier = Modifier
@@ -607,7 +602,6 @@ private fun ActionTile(title: String, subtitle: String, emoji: String, colors: L
 @Composable
 private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val brand = Catalog.brandOf(tea.brand)
-    // 没写名字时，根据9大分类自动生成
     val displayName = tea.name.ifBlank { 
         if (tea.category == "咖啡") "神秘咖啡" else "神秘${tea.category}" 
     }
@@ -727,7 +721,13 @@ private fun EmptyHint(onRecord: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        DrinkCup(modifier = Modifier.width(120.dp).height(150.dp), liquidColor = Color(0xFFDCC7B4), strawColor = Color(0xFFC9B5A3), toppingCount = 3, style = CupStyle.Regular)
+        DrinkCup(
+            modifier = Modifier.width(120.dp).height(150.dp), 
+            liquidColor = Color(0xFFDCC7B4), 
+            strawColor = Color(0xFFC9B5A3), 
+            toppingCount = 3,
+            style = CupStyle.Regular // 👈 这里加上了
+        )
         Spacer(Modifier.height(14.dp))
         Text(text = "还没有记录哦", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(4.dp))
@@ -738,7 +738,6 @@ private fun EmptyHint(onRecord: () -> Unit) {
 fun formatMoney(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.CHINA, "%.1f", value)
 
-// 9大分类智能匹配图片
 fun getDrinkIconRes(tea: Drink): Int {
     val category = DrinkCategory.of(tea.category)
     val isHot = tea.ice.contains("热") || tea.ice.contains("常温")
@@ -751,6 +750,6 @@ fun getDrinkIconRes(tea: Drink): Int {
         DrinkCategory.PureTea -> R.drawable.drink_pure_tea
         DrinkCategory.Bottled -> R.drawable.drink_bottle
         DrinkCategory.Alcohol -> R.drawable.drink_alcohol
-        else -> R.drawable.drink_general // 酸奶和其他
+        else -> R.drawable.drink_general
     }
 }
