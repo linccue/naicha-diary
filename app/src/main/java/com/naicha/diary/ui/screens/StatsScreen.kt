@@ -139,10 +139,14 @@ fun StatPill(
             .clip(RoundedCornerShape(20.dp))
             .background(Color.White)
             .shadow(elevation = 2.dp, shape = RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(0.05f), spotColor = Color.Black.copy(0.05f))
-            .padding(horizontal = 14.dp, vertical = 16.dp)
+            .padding(horizontal = 14.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally // 👈 1. 让上下两部分整体居中
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // 使用荧光黄绿作为唯一的小点缀
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center, // 👈 2. 让绿点和标题在行内居中
+            modifier = Modifier.fillMaxWidth() // 👈 3. 撑满宽度以支持居中
+        ) {
             Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFCBFF00)))
             Spacer(Modifier.width(6.dp))
             Text(
