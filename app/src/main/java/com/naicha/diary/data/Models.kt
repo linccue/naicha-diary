@@ -163,7 +163,7 @@ object Catalog {
     fun isSquircle(name: String): Boolean = name in setOf("喜茶", "奈雪的茶", "霸王茶姬", "陈文鼎", "煲珠公")
     fun sizesFor(category: DrinkCategory): List<String> = listOf("小杯", "中杯", "大杯", "超大杯")
     fun sugarOptions(category: DrinkCategory): List<String> = sugars
-    fun iceOptions(category: DrinkCategory): List<String> = listOf("热饮", "常温", "去冰", "少冰", "正常冰", "多冰")
+    fun iceOptions(category: DrinkCategory): List<String> = listOf("热饮", "常温", "去冰", "少冰", "正常冰")
     fun extraOptions(category: DrinkCategory): List<String> = if (category == DrinkCategory.Coffee) listOf("浓缩", "燕麦奶", "厚乳", "奶油顶") else listOf("珍珠", "椰果", "芋泥", "奶盖", "布丁", "西米")
     fun sugarLabel(category: DrinkCategory): String = "糖度"
     fun iceLabel(category: DrinkCategory): String = "冰量 / 温度"
