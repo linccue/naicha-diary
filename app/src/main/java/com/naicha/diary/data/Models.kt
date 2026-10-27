@@ -16,15 +16,13 @@ enum class DrinkCategory(
     PureTea("纯茶", "茶", 0xFF3B8C4E),
     Bottled("瓶装", "瓶", 0xFF2E86DE),
     Alcohol("酒类", "酒", 0xFF8E44AD),
-    Yogurt("酸奶", "酸", 0xFFE8A0BF),
-    Other("其他", "他", 0xFF95A5A6);
-
+    Yogurt("酸奶", "酸", 0xFFE8A0BF);
     companion object {
         fun of(label: String): DrinkCategory =
             entries.firstOrNull { it.label == label } ?: when(label) {
                 "茶饮" -> MilkTea
                 "咖啡" -> Coffee
-                else -> Other
+                else -> MilkTea
             }
     }
 }
@@ -165,7 +163,6 @@ object Catalog {
         DrinkCategory.Bottled to listOf("东方树叶", "三得利乌龙茶", "农夫山泉", "元气森林"),
         DrinkCategory.Alcohol to listOf("精酿啤酒", "果酒", "微醺", "鸡尾酒"),
         DrinkCategory.Yogurt to listOf("酸奶牛", "满米酸奶", "草莓酸奶"),
-        DrinkCategory.Other to listOf("冰淇淋", "雪糕", "双皮奶")
     )
 
     val moods = listOf("😋", "😌", "🥰", "🥺", "😭", "😡", "🤩", "🤔", "😪", "💪")
