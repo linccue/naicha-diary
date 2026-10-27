@@ -16,13 +16,15 @@ enum class DrinkCategory(
     PureTea("纯茶", "茶", 0xFF3B8C4E),
     Bottled("瓶装", "瓶", 0xFF2E86DE),
     Alcohol("酒类", "酒", 0xFF8E44AD),
-    Yogurt("酸奶", "酸", 0xFFE8A0BF);
+    Yogurt("酸奶", "酸", 0xFFE8A0BF),
+    Other("其他", "他", 0xFF95A5A6);
+
     companion object {
         fun of(label: String): DrinkCategory =
             entries.firstOrNull { it.label == label } ?: when(label) {
                 "茶饮" -> MilkTea
                 "咖啡" -> Coffee
-                else -> MilkTea
+                else -> Other
             }
     }
 }
@@ -77,16 +79,18 @@ data class Brand(
     val category: DrinkCategory,
     val color: Long,
     val badge: String,
-    val logo: Int = R.drawable.logo_mixue // 默认给个图，防止报错
+    val logo: Int
 )
 
 object Catalog {
-    // 糖度选项
     val sugars = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖")
 
     val brands: List<Brand> = listOf(
         // 茶饮
         Brand("蜜雪冰城", DrinkCategory.MilkTea, 0xFFE23A2E, "雪", R.drawable.logo_mixue),
+                Brand("瑞幸咖啡", DrinkCategory.Coffee, 0xFF1C3F94, "瑞", R.drawable.logo_luckin),
+                Brand("陈文鼎", DrinkCategory.MilkTea, 0xFF8B4A2B, "陈", R.drawable.logo_chenwending),
+        Brand("煲珠公", DrinkCategory.MilkTea, 0xFF3A3EC5, "煲", R.drawable.logo_baozhugong),
         Brand("古茗", DrinkCategory.MilkTea, 0xFF2B2B2B, "古", R.drawable.logo_guming),
         Brand("沪上阿姨", DrinkCategory.MilkTea, 0xFFC7303E, "沪", R.drawable.logo_hushangayi),
         Brand("茶百道", DrinkCategory.MilkTea, 0xFF2E86DE, "茶", R.drawable.logo_chabaidao),
@@ -137,21 +141,20 @@ object Catalog {
         Brand("茉沏", DrinkCategory.MilkTea, 0xFF7F8C8D, "茉", R.drawable.logo_moqi),
         Brand("让茶", DrinkCategory.MilkTea, 0xFF27AE60, "让", R.drawable.logo_rangcha),
         Brand("真茶屋", DrinkCategory.MilkTea, 0xFF2ECC71, "真", R.drawable.logo_zhenchawu),
-        Brand("陈文鼎", DrinkCategory.MilkTea, 0xFF8B4A2B, "陈", R.drawable.logo_chenwending),
-        Brand("煲珠公", DrinkCategory.MilkTea, 0xFF3A3EC5, "煲", R.drawable.logo_baozhugong),
-        Brand("自制 / 其他", DrinkCategory.MilkTea, 0xFF8D6E63, "自"),
+    
         
         // 咖啡
-        Brand("瑞幸咖啡", DrinkCategory.Coffee, 0xFF1C3F94, "瑞", R.drawable.logo_luckin),
         Brand("星巴克", DrinkCategory.Coffee, 0xFF00704A, "星", R.drawable.logo_starbucks),
-        Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库"),  R.drawable.logo_cotti),
+        
+ 
+        Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库", R.drawable.logo_luckin), 
         Brand("Manner", DrinkCategory.Coffee, 0xFFC59B5F, "M", R.drawable.logo_manner),
         Brand("M Stand", DrinkCategory.Coffee, 0xFF000000, "M", R.drawable.logo_mstand),
         Brand("Tims", DrinkCategory.Coffee, 0xFFD22630, "T", R.drawable.logo_tims),
         Brand("Peet's", DrinkCategory.Coffee, 0xFF1D4E4F, "P", R.drawable.logo_peets),
         Brand("挪瓦咖啡", DrinkCategory.Coffee, 0xFFEB6B2A, "挪", R.drawable.logo_nowwa),
-        Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸"), R.drawable.logo_luckycup),
-
+        Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸", R.drawable.logo_luckin) 
+         Brand("自制 / 其他", DrinkCategory.MilkTea, 0xFF8D6E63, "自", R.drawable.logo_mixue),
     )
 
     val commonNames = mapOf(
@@ -163,6 +166,7 @@ object Catalog {
         DrinkCategory.Bottled to listOf("东方树叶", "三得利乌龙茶", "农夫山泉", "元气森林"),
         DrinkCategory.Alcohol to listOf("精酿啤酒", "果酒", "微醺", "鸡尾酒"),
         DrinkCategory.Yogurt to listOf("酸奶牛", "满米酸奶", "草莓酸奶"),
+        DrinkCategory.Other to listOf("冰淇淋", "雪糕", "双皮奶")
     )
 
     val moods = listOf("😋", "😌", "🥰", "🥺", "😭", "😡", "🤩", "🤔", "😪", "💪")
