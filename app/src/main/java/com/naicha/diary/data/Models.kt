@@ -144,14 +144,14 @@ object Catalog {
         // 咖啡
         Brand("瑞幸咖啡", DrinkCategory.Coffee, 0xFF1C3F94, "瑞", R.drawable.logo_luckin),
         Brand("星巴克", DrinkCategory.Coffee, 0xFF00704A, "星", R.drawable.logo_starbucks),
-        Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库"), // 修复缺失的 logo
+        Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库"),  R.drawable.logo_cotti),
         Brand("Manner", DrinkCategory.Coffee, 0xFFC59B5F, "M", R.drawable.logo_manner),
         Brand("M Stand", DrinkCategory.Coffee, 0xFF000000, "M", R.drawable.logo_mstand),
         Brand("Tims", DrinkCategory.Coffee, 0xFFD22630, "T", R.drawable.logo_tims),
         Brand("Peet's", DrinkCategory.Coffee, 0xFF1D4E4F, "P", R.drawable.logo_peets),
         Brand("挪瓦咖啡", DrinkCategory.Coffee, 0xFFEB6B2A, "挪", R.drawable.logo_nowwa),
-        Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸"), // 修复缺失的 logo
-        Brand("手冲 / 自制", DrinkCategory.Coffee, 0xFF8D6E63, "手"),
+        Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸"), R.drawable.logo_luckycup),
+
     )
 
     val commonNames = mapOf(
