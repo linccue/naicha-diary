@@ -12,21 +12,21 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 @Composable
@@ -74,46 +74,45 @@ fun CameraCapture(
             modifier = Modifier.fillMaxSize()
         )
 
-        // 拍照按钮
-        Button(
-            onClick = {
-                imageCapture?.takePicture(
-                    ContextCompat.getMainExecutor(context),
-                    object : ImageCapture.OnImageCapturedCallback() {
-                        override fun onCaptureSuccess(image: ImageProxy) {
-                            // 将 ImageProxy 转换为 Bitmap
-                            val bitmap = image.toBitmap()
-                            // 处理旋转
-                            val rotationDegrees = image.imageInfo.rotationDegrees
-                            val rotatedBitmap = bitmap.rotate(rotationDegrees.toFloat())
-                            onPhotoCaptured(rotatedBitmap)
-                            image.close()
-                        }
-
-                        override fun onError(exception: ImageCaptureException) {
-                            exception.printStackTrace()
-                            onCancel()
-                        }
-                    }
-                )
-            },
+        // 👇 1. 拍照按钮：去掉了文字，改成了纯白圆形的Box
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 50.dp)
-                .size(72.dp),
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-        ) {
-            Text(text = "拍", color = Color.Black)
-        }
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+                .clickable {
+                    imageCapture?.takePicture(
+                        ContextCompat.getMainExecutor(context),
+                        object : ImageCapture.OnImageCapturedCallback() {
+                            override fun onCaptureSuccess(image: ImageProxy) {
+                                val bitmap = image.toBitmap()
+                                val rotationDegrees = image.imageInfo.rotationDegrees
+                                val rotatedBitmap = bitmap.rotate(rotationDegrees.toFloat())
+                                onPhotoCaptured(rotatedBitmap)
+                                image.close()
+                            }
 
-        // 取消按钮
-        Button(
-            onClick = onCancel,
+                            override fun onError(exception: ImageCaptureException) {
+                                exception.printStackTrace()
+                                onCancel()
+                            }
+                        }
+                    )
+                }
+        )
+
+        // 👇 2. 取消按钮：加了 statusBarsPadding()，完美避开顶部状态栏
+        Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.6f))
+                .statusBarsPadding() // 👈 避开状态栏
+                .padding(16.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.White.copy(alpha = 0.8f))
+                .clickable { onCancel() }
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             Text(text = "取消", color = Color.Black)
         }
