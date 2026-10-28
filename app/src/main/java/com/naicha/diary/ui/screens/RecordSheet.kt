@@ -79,7 +79,10 @@ fun RecordSheet(
     var ice by remember { mutableStateOf(initial?.ice ?: "") }
     var toppings by remember { mutableStateOf(initial?.toppings ?: emptyList()) }
     var priceText by remember { mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "") }
-    var rating by remember { mutableStateOf(initial?.rating ?: 0) }
+    
+    // 👇 这里已经彻底改为 Float
+    var rating by remember { mutableStateOf(initial?.rating ?: 0f) }
+    
     var mood by remember { mutableStateOf(initial?.mood ?: "") }
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var photoName by remember { mutableStateOf(initial?.photoPath) }
@@ -189,7 +192,6 @@ fun RecordSheet(
         label = "sheetBackground",
     )
 
-    // 👇 核心大括号起始：把弹窗和相机放在同一个 Box 里，保留滚动位置
     Box(modifier = Modifier.fillMaxSize()) {
         ModalBottomSheet(
             onDismissRequest = onDismiss,
@@ -299,6 +301,7 @@ fun RecordSheet(
                             }
                             FieldGroup(title = "评分", modifier = Modifier.weight(1f)) {
                                 Box(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 12.dp, vertical = 15.dp)) {
+                                    // 👇 onRate 直接接受 Float
                                     RatingStars(rating = rating, starSize = 24.dp, onRate = { rating = it })
                                 }
                             }
@@ -413,14 +416,10 @@ fun RecordSheet(
             }
         }
 
-               // 相机悬浮在最上面（用 Dialog 包裹，防止被 ModalBottomSheet 盖住）
         if (showInAppCamera) {
             Dialog(
                 onDismissRequest = { showInAppCamera = false },
-                properties = DialogProperties(
-                    usePlatformDefaultWidth = false, // 允许全屏
-                    decorFitsSystemWindows = false
-                )
+                properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
             ) {
                 CameraCapture(
                     onPhotoCaptured = { bitmap ->
@@ -559,8 +558,9 @@ private fun PreviewRow(liquid: Color, straw: Color, style: CupStyle, toppingCoun
                 Text(text = listOf(name.ifBlank { "还没写品名" }, cupSize, sugar).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (rating > 0) RatingStars(rating = rating, starSize = 14.dp)
-                    if (rating > 0 && mood.isNotBlank()) Spacer(Modifier.width(8.dp))
+                    // 👇 改为 > 0f
+                    if (rating > 0f) RatingStars(rating = rating, starSize = 14.dp)
+                    if (rating > 0f && mood.isNotBlank()) Spacer(Modifier.width(8.dp))
                     if (mood.isNotBlank()) Text(text = mood, fontSize = 16.sp)
                 }
                 Spacer(Modifier.height(10.dp))
