@@ -1,7 +1,6 @@
 package com.naicha.diary.ui.screens
 
 import android.graphics.Bitmap
-import com.naicha.diary.ui.components.CameraCapture
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
@@ -49,7 +48,6 @@ import com.naicha.diary.util.U2NetSegmenter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.io.FileOutputStream
 import java.util.Calendar
 
@@ -89,18 +87,20 @@ fun RecordSheet(
     var selectedDate by remember { mutableStateOf(initial?.timestamp ?: System.currentTimeMillis()) }
 
     var isSegmenting by remember { mutableStateOf(false) }
-        var showInAppCamera by remember { mutableStateOf(false) } // 控制是否显示内置相机
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var aiLoading by remember { mutableStateOf(false) }
     var aiMessage by remember { mutableStateOf<String?>(null) }
+    
+    // 控制是否显示内置相机
+    var showInAppCamera by remember { mutableStateOf(false) }
 
     val brandColor = remember(brand, category) {
         if (brand.isNotBlank()) Color(Catalog.colorOf(brand)) else Color(category.accent)
     }
-    val cupStyle = cupStyleFor(category)
 
     fun switchCategory(next: DrinkCategory) {
         category = next
+        if (brand.isNotBlank() && Catalog.brandOf(brand).category != next) brand = ""
         val sizes = Catalog.sizesFor(next)
         if (cupSize !in sizes) cupSize = sizes.getOrElse(1) { sizes.first() }
         val sugars = Catalog.sugarOptions(next)
@@ -145,6 +145,7 @@ fun RecordSheet(
         if (aiImage != null) { runRecognize(aiImage); onAiImageConsumed() }
     }
 
+    // 处理相册选图和系统相机拍图的回调
     LaunchedEffect(photoImage) {
         if (photoImage != null) {
             isSegmenting = true
@@ -188,22 +189,22 @@ fun RecordSheet(
         animationSpec = tween(420),
         label = "sheetBackground",
     )
-// 👇 加上这段 if 判断
+
+    // 👇 核心大括号起始：如果打开了内置相机，显示相机；否则显示表单
     if (showInAppCamera) {
         CameraCapture(
             onPhotoCaptured = { bitmap ->
                 showInAppCamera = false
-                // 这里直接复制你原来处理照片的代码
+                isSegmenting = true
                 scope.launch {
-                    isSegmenting = true
                     try {
-                        // 1. 保存拍出来的原图
                         val savedFile = PhotoStore.fileOf("photo_${System.currentTimeMillis()}.jpg")
-                        java.io.FileOutputStream(savedFile).use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+                        withContext(Dispatchers.IO) {
+                            FileOutputStream(savedFile).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                        }
                         photoName = savedFile.name
                         previewBitmap = bitmap
 
-                        // 2. 开始抠图
                         withContext(Dispatchers.IO) {
                             try {
                                 U2NetSegmenter.init(context)
@@ -211,280 +212,281 @@ fun RecordSheet(
                                 if (result != null) {
                                     withContext(Dispatchers.Main) { previewBitmap = result }
                                     val newFile = PhotoStore.fileOf("seg_${savedFile.nameWithoutExtension}.png")
-                                    java.io.FileOutputStream(newFile).use { result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                                    FileOutputStream(newFile).use { result.compress(Bitmap.CompressFormat.PNG, 100, it) }
                                     photoName = newFile.name
                                 }
                             } catch (e: Exception) { e.printStackTrace() }
                         }
-                    } catch (e: Exception) { e.printStackTrace() } 
-                    finally { isSegmenting = false }
+                    } catch (e: Exception) { e.printStackTrace() } finally {
+                        isSegmenting = false
+                    }
                 }
             },
             onCancel = { showInAppCamera = false }
         )
     } else {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = sheetBackground,
-        dragHandle = { SheetHandle() },
-    ) {
-         }
-    }
-        Column(modifier = Modifier.fillMaxHeight(0.94f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = if (initial == null) "记一杯" else "编辑记录",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                Spacer(Modifier.weight(1f))
-                Box(
-                    modifier = Modifier.size(34.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh).clickable { onDismiss() },
-                    contentAlignment = Alignment.Center,
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            containerColor = sheetBackground,
+            dragHandle = { SheetHandle() },
+        ) {
+            Column(modifier = Modifier.fillMaxHeight(0.94f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Filled.Close, "关闭", tint = PearlSoft, modifier = Modifier.size(18.dp))
-                }
-            }
-
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-            ) {
-                item {
-                    PreviewRow(
-                        liquid = softLiquid(brandColor), straw = brandColor, style = cupStyle,
-                        toppingCount = (toppings.size + 3).coerceAtMost(10), brand = brand, name = name,
-                        cupSize = cupSize, sugar = sugar, rating = rating, mood = mood,
-                        aiLoading = aiLoading, onAiCamera = { onPick(true, true) }, onAiGallery = { onPick(true, false) },
+                    Text(
+                        text = if (initial == null) "记一杯" else "编辑记录",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onBackground,
                     )
-                }
-
-                if (aiMessage != null) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(brandColor.copy(alpha = 0.10f)).padding(horizontal = 14.dp, vertical = 10.dp)) {
-                            Text(text = aiMessage!!, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        }
+                    Spacer(Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier.size(34.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh).clickable { onDismiss() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.Close, "关闭", tint = PearlSoft, modifier = Modifier.size(18.dp))
                     }
                 }
 
-                item { CategorySwitcher(current = category, onSelect = { switchCategory(it) }) }
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    item {
+                        PreviewRow(
+                            liquid = softLiquid(brandColor), straw = brandColor, style = cupStyleFor(category),
+                            toppingCount = (toppings.size + 3).coerceAtMost(10), brand = brand, name = name,
+                            cupSize = cupSize, sugar = sugar, rating = rating, mood = mood,
+                            aiLoading = aiLoading, onAiCamera = { onPick(true, true) }, onAiGallery = { onPick(true, false) },
+                        )
+                    }
 
-                item {
-                    FieldGroup(title = "品牌", subtitle = "${Catalog.brandsOf(category).size} 个") {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Catalog.brands.forEach { item ->
-                                BrandChip(brand = item, selected = brand == item.name, onClick = { brand = item.name })
+                    if (aiMessage != null) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(brandColor.copy(alpha = 0.10f)).padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                Text(text = aiMessage!!, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     }
-                }
 
-                item {
-                    FieldGroup(title = "喝的是什么") {
-                        Column {
+                    item { CategorySwitcher(current = category, onSelect = { switchCategory(it) }) }
+
+                    item {
+                        FieldGroup(title = "品牌", subtitle = "${Catalog.brandsOf(category).size} 个") {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Catalog.brandsOf(category).forEach { item ->
+                                    BrandChip(brand = item, selected = brand == item.name, onClick = { brand = item.name })
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        FieldGroup(title = "喝的是什么") {
+                            Column {
+                                OutlinedTextField(
+                                    value = name, onValueChange = { name = it },
+                                    placeholder = { Text("例如：多肉葡萄", color = Outline) },
+                                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.medium, colors = drinkFieldColors(),
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Catalog.commonNames[category].orEmpty().forEach { candidate ->
+                                        TagChip(text = candidate, selected = name == candidate, accent = brandColor, onClick = { name = candidate })
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item { FieldGroup(title = "规格") { ChipRow(options = Catalog.sizesFor(category), selected = cupSize, accent = brandColor) { cupSize = it } } }
+                    item { FieldGroup(title = Catalog.sugarLabel(category)) { ChipRow(options = Catalog.sugarOptions(category), selected = sugar, accent = brandColor) { sugar = it } } }
+                    item { FieldGroup(title = Catalog.iceLabel(category)) { ChipRow(options = Catalog.iceOptions(category), selected = ice, accent = brandColor) { ice = it } } }
+                    
+                    item {
+                        FieldGroup(title = Catalog.extraLabel(category), subtitle = "可多选") {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Catalog.extraOptions(category).forEach { item ->
+                                    TagChip(
+                                        text = item, selected = toppings.contains(item), accent = brandColor,
+                                        onClick = { toppings = if (toppings.contains(item)) toppings - item else toppings + item },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            FieldGroup(title = "价格", modifier = Modifier.weight(1f)) {
+                                OutlinedTextField(
+                                    value = priceText,
+                                    onValueChange = { input -> priceText = input.filter { it.isDigit() || it == '.' }.take(7) },
+                                    placeholder = { Text("0", color = Outline) }, prefix = { Text("¥ ", color = Caramel) },
+                                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    shape = MaterialTheme.shapes.medium, colors = drinkFieldColors(), modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            FieldGroup(title = "评分", modifier = Modifier.weight(1f)) {
+                                Box(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 12.dp, vertical = 15.dp)) {
+                                    RatingStars(rating = rating, starSize = 24.dp, onRate = { rating = it })
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        FieldGroup(title = "心情") {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Catalog.moods.forEach { emoji ->
+                                    Box(
+                                        modifier = Modifier.size(46.dp).clip(CircleShape)
+                                            .background(if (mood == emoji) brandColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerLow)
+                                            .border(width = if (mood == emoji) 2.dp else 0.dp, color = if (mood == emoji) brandColor else Color.Transparent, shape = CircleShape)
+                                            .clickable { mood = if (mood == emoji) "" else emoji },
+                                        contentAlignment = Alignment.Center,
+                                    ) { Text(text = emoji, fontSize = 22.sp) }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        FieldGroup(title = "照片", subtitle = "可选") {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isSegmenting) {
+                                    Box(modifier = Modifier.size(84.dp).clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = brandColor)
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(text = "AI 抠图中…", style = MaterialTheme.typography.bodyMedium, color = brandColor)
+                                } else if (previewBitmap != null) {
+                                    Image(
+                                        bitmap = previewBitmap!!.asImageBitmap(), contentDescription = "照片",
+                                        contentScale = ContentScale.Crop, modifier = Modifier.size(84.dp).clip(MaterialTheme.shapes.medium)
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                }
+
+                                if (!isSegmenting) {
+                                    PhotoButton(text = "相册", emoji = "🖼") { onPick(false, false) }
+                                    Spacer(Modifier.width(10.dp))
+                                    // 👇 这里将调起内置相机
+                                    PhotoButton(text = "拍照", emoji = "📷") { showInAppCamera = true }
+                                    if (photoName != null) {
+                                        Spacer(Modifier.width(10.dp))
+                                        PhotoButton(text = "移除", emoji = "✕") { PhotoStore.delete(photoName!!); photoName = null; previewBitmap = null }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        FieldGroup(title = "备注", subtitle = "可选") {
                             OutlinedTextField(
-                                value = name, onValueChange = { name = it },
-                                placeholder = { Text("例如：多肉葡萄", color = Outline) },
-                                singleLine = true, modifier = Modifier.fillMaxWidth(),
+                                value = note, onValueChange = { note = it.take(120) },
+                                placeholder = { Text("今天为什么想喝这杯…", color = Outline) },
+                                minLines = 2, modifier = Modifier.fillMaxWidth(),
                                 shape = MaterialTheme.shapes.medium, colors = drinkFieldColors(),
                             )
-                            Spacer(Modifier.height(10.dp))
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Catalog.commonNames[category].orEmpty().forEach { candidate ->
-                                    TagChip(text = candidate, selected = name == candidate, accent = brandColor, onClick = { name = candidate })
-                                }
-                            }
                         }
                     }
-                }
-
-                item { FieldGroup(title = "规格") { ChipRow(options = Catalog.sizesFor(category), selected = cupSize, accent = brandColor) { cupSize = it } } }
-                item { FieldGroup(title = Catalog.sugarLabel(category)) { ChipRow(options = Catalog.sugarOptions(category), selected = sugar, accent = brandColor) { sugar = it } } }
-                item { FieldGroup(title = Catalog.iceLabel(category)) { ChipRow(options = Catalog.iceOptions(category), selected = ice, accent = brandColor) { ice = it } } }
-                
-                item {
-                    FieldGroup(title = Catalog.extraLabel(category), subtitle = "可多选") {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Catalog.extraOptions(category).forEach { item ->
-                                TagChip(
-                                    text = item, selected = toppings.contains(item), accent = brandColor,
-                                    onClick = { toppings = if (toppings.contains(item)) toppings - item else toppings + item },
-                                )
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        FieldGroup(title = "价格", modifier = Modifier.weight(1f)) {
-                            OutlinedTextField(
-                                value = priceText,
-                                onValueChange = { input -> priceText = input.filter { it.isDigit() || it == '.' }.take(7) },
-                                placeholder = { Text("0", color = Outline) }, prefix = { Text("¥ ", color = Caramel) },
-                                singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                shape = MaterialTheme.shapes.medium, colors = drinkFieldColors(), modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        FieldGroup(title = "评分", modifier = Modifier.weight(1f)) {
-                            Box(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 12.dp, vertical = 15.dp)) {
-                                RatingStars(rating = rating, starSize = 24.dp, onRate = { rating = it })
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    FieldGroup(title = "心情") {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Catalog.moods.forEach { emoji ->
+                    
+                    item {
+                        FieldGroup(title = "日期与时间") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 Box(
-                                    modifier = Modifier.size(46.dp).clip(CircleShape)
-                                        .background(if (mood == emoji) brandColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerLow)
-                                        .border(width = if (mood == emoji) 2.dp else 0.dp, color = if (mood == emoji) brandColor else Color.Transparent, shape = CircleShape)
-                                        .clickable { mood = if (mood == emoji) "" else emoji },
-                                    contentAlignment = Alignment.Center,
-                                ) { Text(text = emoji, fontSize = 22.sp) }
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    FieldGroup(title = "照片", subtitle = "可选") {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (isSegmenting) {
-                                Box(modifier = Modifier.size(84.dp).clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = brandColor)
+                                    modifier = Modifier.weight(1f).clickable { showDatePicker = true }.padding(horizontal = 14.dp, vertical = 14.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Text(text = formatDrinkDate(selectedDate), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                                 }
-                                Spacer(Modifier.width(12.dp))
-                                Text(text = "AI 抠图中…", style = MaterialTheme.typography.bodyMedium, color = brandColor)
-                            } else if (previewBitmap != null) {
-                                Image(
-                                    bitmap = previewBitmap!!.asImageBitmap(), contentDescription = "照片",
-                                    contentScale = ContentScale.Crop, modifier = Modifier.size(84.dp).clip(MaterialTheme.shapes.medium)
-                                )
-                                Spacer(Modifier.width(12.dp))
-                            }
-
-                            if (!isSegmenting) {
-                                PhotoButton(text = "相册", emoji = "🖼") { onPick(false, false) }
-                                Spacer(Modifier.width(10.dp))
-                               PhotoButton(text = "拍照", emoji = "📷") { showInAppCamera = true }
-                                if (photoName != null) {
-                                    Spacer(Modifier.width(10.dp))
-                                    PhotoButton(text = "移除", emoji = "✕") { PhotoStore.delete(photoName!!); photoName = null; previewBitmap = null }
+                                Box(modifier = Modifier.width(1.dp).height(20.dp).background(Outline))
+                                Box(
+                                    modifier = Modifier.weight(1f).clickable { showTimePicker = true }.padding(horizontal = 14.dp, vertical = 14.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Text(text = formatDrinkTime(selectedDate), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
                         }
                     }
+
+                    item { Spacer(Modifier.height(4.dp)) }
                 }
 
-                item {
-                    FieldGroup(title = "备注", subtitle = "可选") {
-                        OutlinedTextField(
-                            value = note, onValueChange = { note = it.take(120) },
-                            placeholder = { Text("今天为什么想喝这杯…", color = Outline) },
-                            minLines = 2, modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium, colors = drinkFieldColors(),
-                        )
-                    }
-                }
-                
-                // === 日期和时间 ===
-                item {
-                    FieldGroup(title = "日期与时间") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                modifier = Modifier.weight(1f).clickable { showDatePicker = true }.padding(horizontal = 14.dp, vertical = 14.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Text(text = formatDrinkDate(selectedDate), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                            }
-                            Box(modifier = Modifier.width(1.dp).height(20.dp).background(Outline))
-                            Box(
-                                modifier = Modifier.weight(1f).clickable { showTimePicker = true }.padding(horizontal = 14.dp, vertical = 14.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Text(text = formatDrinkTime(selectedDate), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                            }
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (initial != null && onDelete != null) {
+                        Box(modifier = Modifier.size(52.dp).clip(CircleShape).background(Strawberry.copy(alpha = 0.16f)).clickable { onDelete(initial) }, contentAlignment = Alignment.Center) {
+                            Icon(Icons.Filled.Delete, "删除", tint = Strawberry, modifier = Modifier.size(22.dp))
                         }
+                        Spacer(Modifier.width(12.dp))
                     }
+                    GradientButton(
+                        text = if (initial == null) "记下这一杯" else "保存修改",
+                        onClick = {
+                            val item = (initial ?: Drink()).copy(
+                                category = category.label, brand = brand.ifBlank { "自制 / 其他" }, name = name.trim(),
+                                cupSize = cupSize, sugar = sugar, ice = ice, toppings = toppings,
+                                price = priceText.toDoubleOrNull() ?: 0.0, rating = rating, mood = mood,
+                                note = note.trim(), photoPath = photoName, timestamp = selectedDate,
+                            )
+                            onSave(item)
+                        },
+                        modifier = Modifier.weight(1f), colors = listOf(brandColor, brandColor.copy(alpha = 0.75f)),
+                        leading = { Icon(Icons.Filled.Add, null, tint = Color.White, modifier = Modifier.size(18.dp)) },
+                    )
                 }
-
-                item { Spacer(Modifier.height(4.dp)) }
-            }
-
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (initial != null && onDelete != null) {
-                    Box(modifier = Modifier.size(52.dp).clip(CircleShape).background(Strawberry.copy(alpha = 0.16f)).clickable { onDelete(initial) }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Delete, "删除", tint = Strawberry, modifier = Modifier.size(22.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                }
-                GradientButton(
-                    text = if (initial == null) "记下这一杯" else "保存修改",
-                    onClick = {
-                        val item = (initial ?: Drink()).copy(
-                            category = category.label, brand = brand.ifBlank { "自制 / 其他" }, name = name.trim(),
-                            cupSize = cupSize, sugar = sugar, ice = ice, toppings = toppings,
-                            price = priceText.toDoubleOrNull() ?: 0.0, rating = rating, mood = mood,
-                            note = note.trim(), photoPath = photoName, timestamp = selectedDate,
-                        )
-                        onSave(item)
-                    },
-                    modifier = Modifier.weight(1f), colors = listOf(brandColor, brandColor.copy(alpha = 0.75f)),
-                    leading = { Icon(Icons.Filled.Add, null, tint = Color.White, modifier = Modifier.size(18.dp)) },
-                )
             }
         }
-    }
 
-    // 日期弹窗
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = timestampToDatePickerMillis(selectedDate))
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { picked -> selectedDate = datePickerMillisToTimestamp(picked, selectedDate) }
-                    showDatePicker = false
-                }) { Text("确定") }
-            },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
-        ) { DatePicker(state = datePickerState) }
-    }
+        // 👇 弹窗写在 else 分支里面，确保作用域正确
+        if (showDatePicker) {
+            val datePickerState = rememberDatePickerState(initialSelectedDateMillis = timestampToDatePickerMillis(selectedDate))
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        datePickerState.selectedDateMillis?.let { picked -> selectedDate = datePickerMillisToTimestamp(picked, selectedDate) }
+                        showDatePicker = false
+                    }) { Text("确定") }
+                },
+                dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } }
+            ) { DatePicker(state = datePickerState) }
+        }
 
-    // 时间弹窗
-    if (showTimePicker) {
-        val cal = Calendar.getInstance().apply { timeInMillis = selectedDate }
-        val timePickerState = rememberTimePickerState(initialHour = cal.get(Calendar.HOUR_OF_DAY), initialMinute = cal.get(Calendar.MINUTE), is24Hour = true)
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    val newCal = Calendar.getInstance().apply {
-                        timeInMillis = selectedDate
-                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
-                        set(Calendar.MINUTE, timePickerState.minute)
-                    }
-                    selectedDate = newCal.timeInMillis
-                    showTimePicker = false
-                }) { Text("确定") }
-            },
-            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("取消") } },
-            text = { TimePicker(state = timePickerState) }
-        )
+        if (showTimePicker) {
+            val cal = Calendar.getInstance().apply { timeInMillis = selectedDate }
+            val timePickerState = rememberTimePickerState(initialHour = cal.get(Calendar.HOUR_OF_DAY), initialMinute = cal.get(Calendar.MINUTE), is24Hour = true)
+            AlertDialog(
+                onDismissRequest = { showTimePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val newCal = Calendar.getInstance().apply {
+                            timeInMillis = selectedDate
+                            set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                            set(Calendar.MINUTE, timePickerState.minute)
+                        }
+                        selectedDate = newCal.timeInMillis
+                        showTimePicker = false
+                    }) { Text("确定") }
+                },
+                dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("取消") } },
+                text = { TimePicker(state = timePickerState) }
+            )
+        }
     }
 }
+
+// ================= 辅助组件与函数 =================
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -517,13 +519,15 @@ private fun CategorySwitcher(
                     text = entry.label,
                     fontSize = 16.sp, 
                     color = textColor, 
-                    fontWeight = FontWeight.Black // 延续原来的粗黑体
+                    fontWeight = FontWeight.Black
                 )
             }
         }
     }
 }
-@Composable private fun BrandChip(brand: Brand, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+
+@Composable
+private fun BrandChip(brand: Brand, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val color = Color(brand.color)
     Column(modifier = modifier.width(74.dp).clip(RoundedCornerShape(22.dp)).background(if (selected) color.copy(alpha = 0.12f) else Color.Transparent).border(if (selected) 2.dp else 0.dp, if (selected) color else Color.Transparent, RoundedCornerShape(22.dp)).clickable(onClick = onClick).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         BrandBadge(badge = brand.badge, color = color, size = 40.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
@@ -532,9 +536,11 @@ private fun CategorySwitcher(
     }
 }
 
-@Composable private fun SheetHandle() { Box(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) { Box(modifier = Modifier.width(44.dp).height(5.dp).clip(CircleShape).background(Outline)) } }
+@Composable
+private fun SheetHandle() { Box(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) { Box(modifier = Modifier.width(44.dp).height(5.dp).clip(CircleShape).background(Outline)) } }
 
-@Composable private fun PreviewRow(liquid: Color, straw: Color, style: CupStyle, toppingCount: Int, brand: String, name: String, cupSize: String, sugar: String, rating: Int, mood: String, aiLoading: Boolean, onAiCamera: () -> Unit, onAiGallery: () -> Unit) {
+@Composable
+private fun PreviewRow(liquid: Color, straw: Color, style: CupStyle, toppingCount: Int, brand: String, name: String, cupSize: String, sugar: String, rating: Int, mood: String, aiLoading: Boolean, onAiCamera: () -> Unit, onAiGallery: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(Brush.horizontalGradient(listOf(straw.copy(alpha = 0.14f), MaterialTheme.colorScheme.surfaceContainerLow))).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DrinkCup(modifier = Modifier.width(78.dp).height(100.dp), liquidColor = liquid, strawColor = straw, toppingCount = toppingCount, style = style)
@@ -566,8 +572,10 @@ private fun CategorySwitcher(
     }
 }
 
-@Composable private fun AiChip(text: String, onClick: () -> Unit) { Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp)) { Text(text = text, style = MaterialTheme.typography.labelMedium, color = PearlSoft, fontWeight = FontWeight.SemiBold) } }
-@Composable private fun FieldGroup(title: String, modifier: Modifier = Modifier, subtitle: String? = null, content: @Composable () -> Unit) {
+@Composable
+private fun AiChip(text: String, onClick: () -> Unit) { Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp)) { Text(text = text, style = MaterialTheme.typography.labelMedium, color = PearlSoft, fontWeight = FontWeight.SemiBold) } }
+@Composable
+private fun FieldGroup(title: String, modifier: Modifier = Modifier, subtitle: String? = null, content: @Composable () -> Unit) {
     Column(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
@@ -577,20 +585,22 @@ private fun CategorySwitcher(
         content()
     }
 }
-@Composable private fun ChipRow(options: List<String>, selected: String, accent: Color, onSelect: (String) -> Unit) {
+@Composable
+private fun ChipRow(options: List<String>, selected: String, accent: Color, onSelect: (String) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { option -> TagChip(text = option, selected = selected == option, accent = accent, onClick = { onSelect(option) }) }
     }
 }
-@Composable private fun PhotoButton(text: String, emoji: String, onClick: () -> Unit) {
+@Composable
+private fun PhotoButton(text: String, emoji: String, onClick: () -> Unit) {
     Column(modifier = Modifier.clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = emoji, fontSize = 18.sp); Spacer(Modifier.height(2.dp)); Text(text = text, style = MaterialTheme.typography.labelMedium, color = PearlSoft)
     }
 }
-@Composable private fun drinkFieldColors() = OutlinedTextFieldDefaults.colors(focusedBorderColor = Caramel, unfocusedBorderColor = Outline, focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow, cursorColor = Caramel, focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
+@Composable
+private fun drinkFieldColors() = OutlinedTextFieldDefaults.colors(focusedBorderColor = Caramel, unfocusedBorderColor = Outline, focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow, cursorColor = Caramel, focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface)
 private fun softLiquid(color: Color): Color = Color(red = color.red * 0.62f + 0.38f, green = color.green * 0.62f + 0.38f, blue = color.blue * 0.62f + 0.38f, alpha = 1f)
 
-// === 时间工具 ===
 private fun timestampToDatePickerMillis(timestamp: Long): Long = java.time.Instant.ofEpochMilli(timestamp).atZone(java.time.ZoneId.systemDefault()).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
 private fun datePickerMillisToTimestamp(datePickerMillis: Long, originalTimestamp: Long): Long {
     val date = java.time.Instant.ofEpochMilli(datePickerMillis).atZone(java.time.ZoneOffset.UTC).toLocalDate()
