@@ -612,45 +612,54 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 外层容器固定 76dp，负责对齐
-                Box(modifier = Modifier.size(76.dp), contentAlignment = Alignment.Center) {
+                // 👇 将整个容器缩小为 64dp，作为绝对尺寸的参照物
+                Box(modifier = Modifier.size(64.dp), contentAlignment = Alignment.Center) {
                     
-                    // 👇 核心改动：无论抠图还是预设图，图片显示区域强制锁定为 64dp
                     if (tea.photoPath != null) {
+                        // 👇 抠图：使用 Crop 裁剪掉透明留白，让它撑满
                         LocalPhoto(
                             file = PhotoStore.fileOf(tea.photoPath),
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.size(64.dp) // 固定大小
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize() // 强制填满 64dp
                         )
                     } else {
+                        // 👇 预设图：使用 Fit 保证线稿不被切边
                         Image(
                             painter = painterResource(id = getDrinkIconRes(tea)),
                             contentDescription = null,
-                            modifier = Modifier.size(64.dp), // 固定大小，去掉了 padding
+                            modifier = Modifier.fillMaxSize().padding(6.dp), // 留一点边距防裁切
                             contentScale = ContentScale.Fit
                         )
                     }
                     
-                    // 品牌 Logo 固定在右下角
-                    BrandBadge(
-                        badge = brand.badge,
-                        color = Color(brand.color),
-                        size = 22.dp,
-                        logo = brand.logo,
-                        squircle = Catalog.isSquircle(brand.name),
+                    // 👇 品牌 Logo：加白色圆形底座，绝对锁定在右下角
+                    Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .offset(x = 2.dp, y = 2.dp)
-                    )
+                            .offset(x = 4.dp, y = 4.dp)
+                            .background(Color.White, CircleShape)
+                            .padding(2.dp)
+                    ) {
+                        BrandBadge(
+                            badge = brand.badge,
+                            color = Color(brand.color),
+                            size = 20.dp, // 尺寸微调，显得更精致
+                            logo = brand.logo,
+                            squircle = Catalog.isSquircle(brand.name)
+                        )
+                    }
                 }
 
                 Spacer(Modifier.width(16.dp))
 
+                // ================= 右侧文字区域 =================
                 Column(modifier = Modifier.weight(1f)) {
+                    
+                    // 第一行：品名 + 日期
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = displayName,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -662,17 +671,19 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
                                 .background(Color(0xFFF4F5F0))
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = TimeUtil.dayLabel(tea.timestamp),
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = PearlSoft
                             )
                         }
                     }
                     
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(4.dp))
+                    
+                    // 第二行：品牌名
                     Text(
                         text = tea.brand.ifBlank { "未知品牌" },
                         style = MaterialTheme.typography.bodyMedium,
@@ -681,31 +692,34 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                         overflow = TextOverflow.Ellipsis
                     )
                     
-                    Spacer(Modifier.height(6.dp))
-                    RatingStars(rating = tea.rating, starSize = 14.dp)
+                    Spacer(Modifier.height(8.dp))
                     
+                    // 第三行：评分
+                    RatingStars(rating = tea.rating, starSize = 16.dp)
+                    
+                    // 第四行：标签
                     val tags = mutableListOf<String>()
                     if (tea.sugar.isNotBlank()) tags.add(tea.sugar)
                     if (tea.ice.isNotBlank()) tags.add(tea.ice)
                     if (tea.toppings.isNotEmpty()) tags.addAll(tea.toppings)
 
                     if (tags.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(10.dp))
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             tags.forEach { tag ->
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
-                                        .border(0.5.dp, Color(0xFFE0E0E0), RoundedCornerShape(50))
+                                        .border(1.dp, Color(0xFFE5E5E5), RoundedCornerShape(50))
                                         .background(Color.White)
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        .padding(horizontal = 12.dp, vertical = 5.dp)
                                 ) {
                                     Text(
                                         text = tag,
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
@@ -714,7 +728,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     }
                 }
             }
-            Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Color(0xFFE0E0E0)))
+            Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Color(0xFFF0F0F0)))
         }
     }
 }
