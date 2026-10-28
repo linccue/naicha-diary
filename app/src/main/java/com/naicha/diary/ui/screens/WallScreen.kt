@@ -40,6 +40,7 @@ import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -252,12 +253,13 @@ class StickerNode(
 
 @Composable
 private fun DraggableStickerWall(items: List<Drink>) {
-    val displayItems = remember(items) { items.take(6) }
+    // 为了铺满两层，这里把展示数量增加到了 12 个
+    val displayItems = remember(items) { items.take(12) }
     if (displayItems.isEmpty()) return
 
-    val cardSize = 72.dp
+    val cardSize = 64.dp // 为了铺满，卡片稍微改小一点点
     val wallHeight = 220.dp
-    val density = LocalDensity.current // 👈 新增密度获取
+    val density = LocalDensity.current
 
     BoxWithConstraints(
         modifier = Modifier
@@ -266,17 +268,35 @@ private fun DraggableStickerWall(items: List<Drink>) {
             .clip(RoundedCornerShape(24.dp))
             .background(Color(0xFFE6E8E0))
     ) {
-        val maxX = constraints.maxWidth - with(density) { cardSize.toPx() } // 👈 使用 density 转换
-        val maxY = constraints.maxHeight - with(density) { cardSize.toPx() } // 👈 使用 density 转换
+        val maxWidthPx = constraints.maxWidth.toFloat()
+        val maxHeightPx = constraints.maxHeight.toFloat()
+        val cardSizePx = with(density) { cardSize.toPx() }
+        val gapX = with(density) { 4.dp.toPx() } // 平铺间距
+        val gapY = with(density) { 4.dp.toPx() }
+        val paddingStart = with(density) { 16.dp.toPx() }
+        val paddingBottom = with(density) { 16.dp.toPx() }
 
-        val nodes = remember(displayItems, maxX, maxY) {
+        // 掉落的起点：卡片顶端上方
+        val startY = -cardSizePx * 2 
+
+        // 计算一行能铺下几个
+        val columns = ((maxWidthPx - paddingStart * 2 + gapX) / (cardSizePx + gapX)).toInt().coerceAtLeast(1)
+
+        val nodes = remember(displayItems, maxWidthPx, maxHeightPx) {
             displayItems.mapIndexed { index, tea ->
-                val x = Random.nextFloat() * (maxX * 0.7f)
-                val y = Random.nextFloat() * (maxY * 0.7f)
+                // 计算当前贴纸应该在的行和列
+                val row = index / columns
+                val col = index % columns
+                
+                // X 轴：从左往右排
+                val targetX = paddingStart + col * (cardSizePx + gapX)
+                // Y 轴：从卡片底部往上排 (row=0是底部)
+                val targetY = maxHeightPx - paddingBottom - (row + 1) * cardSizePx - row * gapY
+                
                 StickerNode(
                     tea = tea,
-                    initialOffset = Offset(x, y),
-                    rotation = Random.nextFloat() * 16f - 8f
+                    initialOffset = Offset(targetX, targetY),
+                    rotation = Random.nextFloat() * 4f - 2f // 平铺时旋转角度小一点，显得整齐
                 )
             }
         }
@@ -286,8 +306,9 @@ private fun DraggableStickerWall(items: List<Drink>) {
                 node = node,
                 index = index,
                 cardSize = cardSize,
-                maxX = maxX,
-                maxY = maxY
+                maxX = maxWidthPx - cardSizePx,
+                maxY = maxHeightPx - cardSizePx,
+                startY = startY
             )
         }
     }
@@ -297,16 +318,23 @@ private fun DraggableStickerWall(items: List<Drink>) {
 private fun DraggableStickerItem(
     node: StickerNode,
     index: Int,
-    cardSize: androidx.compose.ui.unit.Dp,
+    cardSize: Dp,
     maxX: Float,
-    maxY: Float
+    maxY: Float,
+    startY: Float
 ) {
-    val animY = remember { Animatable(-400f) }
+    // 掉落动画，从 startY (卡片顶端外) 掉到 node.offsetY (计算好的目标位置)
+    val animY = remember { Animatable(startY) }
+    
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(index * 100L)
+        // 按照 index 错开一点时间，让它们像瀑布一样依次掉落
+        kotlinx.coroutines.delay(index * 60L)
         animY.animateTo(
             targetValue = node.offsetY,
-            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
         )
     }
 
@@ -317,6 +345,7 @@ private fun DraggableStickerItem(
         modifier = Modifier
             .zIndex(if (node.isDragging) 10f else 1f)
             .offset {
+                // 掉落时 X 轴固定在目标位置，直上直下；掉落后加上拖拽偏移
                 val curX = if (animY.isRunning) node.offsetX else (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
                 val curY = if (animY.isRunning) animY.value else (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
                 IntOffset(curX.roundToInt(), curY.roundToInt())
