@@ -31,7 +31,7 @@ data class Drink(
     val ice: String = "少冰",
     val toppings: List<String> = emptyList(),
     val price: Double = 0.0,
-    val rating: Int = 5,
+    val rating: Float = 5,
     val mood: String = "😋",
     val note: String = "",
     val photoPath: String? = null,
