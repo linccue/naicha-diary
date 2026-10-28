@@ -1,9 +1,13 @@
 package com.naicha.diary.ui.screens
 
 import android.graphics.BitmapFactory
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,14 +22,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,6 +40,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.Drink
 import com.naicha.diary.ui.components.*
@@ -42,6 +50,8 @@ import com.naicha.diary.util.TimeUtil
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
+import kotlin.random.Random
 
 private enum class WallMode(val label: String, val emoji: String) {
     Wall("饮品墙", "🧱"),
@@ -160,7 +170,8 @@ private fun StickerWallView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            StickerDisplayWall(items)
+            // 👇 拖拽+掉落版贴纸墙
+            DraggableStickerWall(items)
         }
 
         groupedItems.forEach { (dateStr, dayItems) ->
@@ -185,28 +196,110 @@ private fun StickerWallView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
     }
 }
 
+// ================= 核心组件：可拖拽、固定大小、掉落动画的贴纸墙 =================
+class StickerNode(
+    val tea: Drink,
+    initialOffset: Offset,
+    val rotation: Float
+) {
+    var offset by mutableStateOf(initialOffset)
+    var isDragging by mutableStateOf(false)
+}
+
 @Composable
-private fun StickerDisplayWall(items: List<Drink>) {
-    val displayItems = remember(items) { items.take(8) }
+private fun DraggableStickerWall(items: List<Drink>) {
+    val displayItems = remember(items) { items.take(6) } // 最多展示6个，防止太拥挤
     if (displayItems.isEmpty()) return
 
-    Box(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color(0xFFE6E8E0)).padding(vertical = 32.dp, horizontal = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            displayItems.forEachIndexed { index, tea ->
-                val yOffset = when (index % 4) { 0 -> (-12).dp; 1 -> 12.dp; 2 -> (-4).dp; else -> 6.dp }
-                val rotation = when (index % 4) { 0 -> -8f; 1 -> 10f; 2 -> -3f; else -> 5f }
-                Box(modifier = Modifier.offset(y = yOffset).rotate(rotation).padding(horizontal = 2.dp)) {
-                    StickerImage(tea = tea, modifier = Modifier.size(64.dp))
-                }
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    // 固定卡片的高度
+    val wallHeight = 200.dp
+
+    // 初始化位置（让它们错落排开）
+    val nodes = remember(displayItems) {
+        displayItems.mapIndexed { index, tea ->
+            val x = when (index % 3) {
+                0 -> 20f
+                1 -> screenWidth.value / 2 - 30f
+                else -> screenWidth.value - 80f
             }
+            val y = when (index % 2) {
+                0 -> 40f
+                else -> 100f
+            }
+            StickerNode(
+                tea = tea,
+                initialOffset = Offset(x, y),
+                rotation = Random.nextFloat() * 16f - 8f // 随机 -8度 到 8度
+            )
         }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(wallHeight)
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color(0xFFE6E8E0))
+    ) {
+        nodes.forEachIndexed { index, node ->
+            DraggableStickerItem(node = node, index = index, wallHeight = wallHeight)
+        }
+    }
+}
+
+@Composable
+private fun DraggableStickerItem(node: StickerNode, index: Int, wallHeight: androidx.compose.ui.unit.Dp) {
+    // 使用 Animatable 记录 Y 轴的掉落动画
+    val animY = remember { Animatable(-600f) }
+    
+    // 首次进入，错开时间掉落
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 150L)
+        animY.animateTo(
+            targetValue = node.offset.y,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
+    }
+
+    // 当手指拖动时，实时更新坐标
+    var dragOffsetX by remember { mutableStateOf(0f) }
+    var dragOffsetY by remember { mutableStateOf(0f) }
+
+    Box(
+        modifier = Modifier
+            .zIndex(if (node.isDragging) 10f else 1f) // 拖拽时置顶
+            .offset {
+                // 掉落动画中，Y轴用 animY；如果掉落完成，用拖拽偏移量
+                val currentX = if (animY.isRunning) node.offset.x else node.offset.x + dragOffsetX
+                val currentY = if (animY.isRunning) animY.value else node.offset.y + dragOffsetY
+                IntOffset(currentX.roundToInt(), currentY.roundToInt())
+            }
+            .size(72.dp) // 👈 固定卡片大小 72x72
+            .rotate(node.rotation)
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { node.isDragging = true },
+                    onDragEnd = { 
+                        node.isDragging = false
+                        // 拖拽结束时，把最终位置保存下来
+                        node.offset = Offset(node.offset.x + dragOffsetX, node.offset.y + dragOffsetY)
+                        dragOffsetX = 0f
+                        dragOffsetY = 0f
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragOffsetX += dragAmount.x
+                        dragOffsetY += dragAmount.y
+                    }
+                )
+            }
+    ) {
+        StickerImage(tea = node.tea, modifier = Modifier.fillMaxSize())
     }
 }
 
