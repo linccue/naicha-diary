@@ -1,6 +1,9 @@
 package com.naicha.diary.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
