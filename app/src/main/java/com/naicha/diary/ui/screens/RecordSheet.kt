@@ -1,6 +1,7 @@
 package com.naicha.diary.ui.screens
 
 import android.graphics.Bitmap
+import com.naicha.diary.ui.components.CameraCapture
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
@@ -88,6 +89,7 @@ fun RecordSheet(
     var selectedDate by remember { mutableStateOf(initial?.timestamp ?: System.currentTimeMillis()) }
 
     var isSegmenting by remember { mutableStateOf(false) }
+        var showInAppCamera by remember { mutableStateOf(false) } // 控制是否显示内置相机
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var aiLoading by remember { mutableStateOf(false) }
     var aiMessage by remember { mutableStateOf<String?>(null) }
@@ -186,13 +188,49 @@ fun RecordSheet(
         animationSpec = tween(420),
         label = "sheetBackground",
     )
+// 👇 加上这段 if 判断
+    if (showInAppCamera) {
+        CameraCapture(
+            onPhotoCaptured = { bitmap ->
+                showInAppCamera = false
+                // 这里直接复制你原来处理照片的代码
+                scope.launch {
+                    isSegmenting = true
+                    try {
+                        // 1. 保存拍出来的原图
+                        val savedFile = PhotoStore.fileOf("photo_${System.currentTimeMillis()}.jpg")
+                        java.io.FileOutputStream(savedFile).use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+                        photoName = savedFile.name
+                        previewBitmap = bitmap
 
+                        // 2. 开始抠图
+                        withContext(Dispatchers.IO) {
+                            try {
+                                U2NetSegmenter.init(context)
+                                val result = U2NetSegmenter.removeBackground(bitmap)
+                                if (result != null) {
+                                    withContext(Dispatchers.Main) { previewBitmap = result }
+                                    val newFile = PhotoStore.fileOf("seg_${savedFile.nameWithoutExtension}.png")
+                                    java.io.FileOutputStream(newFile).use { result.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                                    photoName = newFile.name
+                                }
+                            } catch (e: Exception) { e.printStackTrace() }
+                        }
+                    } catch (e: Exception) { e.printStackTrace() } 
+                    finally { isSegmenting = false }
+                }
+            },
+            onCancel = { showInAppCamera = false }
+        )
+    } else {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = sheetBackground,
         dragHandle = { SheetHandle() },
     ) {
+         }
+    }
         Column(modifier = Modifier.fillMaxHeight(0.94f)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
@@ -337,7 +375,7 @@ fun RecordSheet(
                             if (!isSegmenting) {
                                 PhotoButton(text = "相册", emoji = "🖼") { onPick(false, false) }
                                 Spacer(Modifier.width(10.dp))
-                                PhotoButton(text = "拍照", emoji = "📷") { onPick(false, true) }
+                               PhotoButton(text = "拍照", emoji = "📷") { showInAppCamera = true }
                                 if (photoName != null) {
                                     Spacer(Modifier.width(10.dp))
                                     PhotoButton(text = "移除", emoji = "✕") { PhotoStore.delete(photoName!!); photoName = null; previewBitmap = null }
