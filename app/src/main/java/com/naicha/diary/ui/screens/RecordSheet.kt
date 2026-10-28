@@ -34,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.sp
 import com.naicha.diary.data.AppSettings
 import com.naicha.diary.data.Brand
@@ -411,40 +413,48 @@ fun RecordSheet(
             }
         }
 
-        // 相机悬浮在最上面
+               // 相机悬浮在最上面（用 Dialog 包裹，防止被 ModalBottomSheet 盖住）
         if (showInAppCamera) {
-            CameraCapture(
-                onPhotoCaptured = { bitmap ->
-                    showInAppCamera = false
-                    isSegmenting = true
-                    scope.launch {
-                        try {
-                            val savedFile = PhotoStore.fileOf("photo_${System.currentTimeMillis()}.jpg")
-                            withContext(Dispatchers.IO) {
-                                FileOutputStream(savedFile).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                            }
-                            photoName = savedFile.name
-                            previewBitmap = bitmap
+            Dialog(
+                onDismissRequest = { showInAppCamera = false },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false, // 允许全屏
+                    decorFitsSystemWindows = false
+                )
+            ) {
+                CameraCapture(
+                    onPhotoCaptured = { bitmap ->
+                        showInAppCamera = false
+                        isSegmenting = true
+                        scope.launch {
+                            try {
+                                val savedFile = PhotoStore.fileOf("photo_${System.currentTimeMillis()}.jpg")
+                                withContext(Dispatchers.IO) {
+                                    FileOutputStream(savedFile).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                                }
+                                photoName = savedFile.name
+                                previewBitmap = bitmap
 
-                            withContext(Dispatchers.IO) {
-                                try {
-                                    U2NetSegmenter.init(context)
-                                    val result = U2NetSegmenter.removeBackground(bitmap)
-                                    if (result != null) {
-                                        withContext(Dispatchers.Main) { previewBitmap = result }
-                                        val newFile = PhotoStore.fileOf("seg_${savedFile.nameWithoutExtension}.png")
-                                        FileOutputStream(newFile).use { result.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                                        photoName = newFile.name
-                                    }
-                                } catch (e: Exception) { e.printStackTrace() }
+                                withContext(Dispatchers.IO) {
+                                    try {
+                                        U2NetSegmenter.init(context)
+                                        val result = U2NetSegmenter.removeBackground(bitmap)
+                                        if (result != null) {
+                                            withContext(Dispatchers.Main) { previewBitmap = result }
+                                            val newFile = PhotoStore.fileOf("seg_${savedFile.nameWithoutExtension}.png")
+                                            FileOutputStream(newFile).use { result.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                                            photoName = newFile.name
+                                        }
+                                    } catch (e: Exception) { e.printStackTrace() }
+                                }
+                            } catch (e: Exception) { e.printStackTrace() } finally {
+                                isSegmenting = false
                             }
-                        } catch (e: Exception) { e.printStackTrace() } finally {
-                            isSegmenting = false
                         }
-                    }
-                },
-                onCancel = { showInAppCamera = false }
-            )
+                    },
+                    onCancel = { showInAppCamera = false }
+                )
+            }
         }
 
         if (showDatePicker) {
