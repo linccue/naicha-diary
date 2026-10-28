@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,8 +25,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -32,9 +35,9 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -48,6 +51,7 @@ import com.naicha.diary.ui.theme.*
 import com.naicha.diary.util.PhotoStore
 import com.naicha.diary.util.TimeUtil
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -83,6 +87,7 @@ fun WallScreen(
         )
 
         Column(modifier = Modifier.fillMaxSize()) {
+            // 顶部标题与切换
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -133,7 +138,7 @@ fun WallScreen(
             }
 
             when (mode) {
-                WallMode.Wall -> StickerWallView(items = sorted, onOpenDetail = onOpenDetail)
+                WallMode.Wall -> WallTabContent(items = sorted, onOpenDetail = onOpenDetail)
                 WallMode.Brand -> BrandRank(items = sorted)
                 WallMode.Timeline -> TimelineView(items = sorted, onOpenDetail = onOpenDetail)
             }
@@ -151,150 +156,203 @@ fun WallScreen(
     }
 }
 
+// ================= 饮品墙模式 =================
 @Composable
-private fun StickerWallView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
-    if (items.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(text = "墙上还空空的哦", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
+    // 日历状态
+    var currentMonth by remember { mutableStateOf(Calendar.getInstance()) }
+    var selectedDay by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH)) }
+
+    val year = currentMonth.get(Calendar.YEAR)
+    val month = currentMonth.get(Calendar.MONTH)
+    
+    // 过滤出当前月的数据
+    val monthItems = remember(items, year, month) {
+        items.filter {
+            val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
+            c.get(Calendar.YEAR) == year && c.get(Calendar.MONTH) == month
         }
-        return
+    }
+    
+    // 按天分组
+    val dayRecords = remember(monthItems) {
+        monthItems.groupBy {
+            Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.DAY_OF_MONTH)
+        }
     }
 
-    val groupedItems = remember(items) {
-        items.groupBy { SimpleDateFormat("dd日 EEEE", Locale.CHINA).format(Date(it.timestamp)) }
-    }
+    val selectedDayRecords = dayRecords[selectedDay] ?: emptyList()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 1. 顶部贴纸墙
         item {
-            // 👇 拖拽+掉落版贴纸墙
             DraggableStickerWall(items)
         }
 
-        groupedItems.forEach { (dateStr, dayItems) ->
+        // 2. 日历卡片
+        item {
+            CalendarCard(
+                currentMonth = currentMonth,
+                onMonthChange = { 
+                    currentMonth = it 
+                    selectedDay = 1 // 切换月份时重置选中天
+                },
+                monthItems = monthItems,
+                dayRecords = dayRecords,
+                selectedDay = selectedDay,
+                onSelectDay = { selectedDay = it }
+            )
+        }
+
+        // 3. 选中日期的记录列表头部
+        item {
+            val dateStr = SimpleDateFormat("d日 EEEE", Locale.CHINA).format(
+                Calendar.getInstance().apply {
+                    set(Calendar.YEAR, year)
+                    set(Calendar.MONTH, month)
+                    set(Calendar.DAY_OF_MONTH, selectedDay)
+                }.time
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = dateStr, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                Text(
+                    text = "${selectedDayRecords.size} 杯", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PearlSoft,
+                    modifier = Modifier.background(Color(0xFFF4F5F0), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        // 4. 选中日期的具体记录
+        if (selectedDayRecords.isEmpty()) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFFF4F5F0)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(text = dateStr, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                    Text(
-                        text = "${dayItems.size} 杯", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PearlSoft,
-                        modifier = Modifier.background(Color.White, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                    Text(text = "当天暂无记录", style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
                 }
             }
-
-            items(dayItems, key = { it.id }) { tea ->
+        } else {
+            items(selectedDayRecords, key = { it.id }) { tea ->
                 WallStickerRow(tea = tea, onClick = { onOpenDetail(tea) })
             }
         }
     }
 }
 
-// ================= 核心组件：可拖拽、固定大小、掉落动画的贴纸墙 =================
+// ================= 修复边界限制的拖拽贴纸墙 =================
 class StickerNode(
     val tea: Drink,
     initialOffset: Offset,
     val rotation: Float
 ) {
-    var offset by mutableStateOf(initialOffset)
+    var offsetX by mutableStateOf(initialOffset.x)
+    var offsetY by mutableStateOf(initialOffset.y)
     var isDragging by mutableStateOf(false)
 }
 
 @Composable
 private fun DraggableStickerWall(items: List<Drink>) {
-    val displayItems = remember(items) { items.take(6) } // 最多展示6个，防止太拥挤
+    val displayItems = remember(items) { items.take(6) }
     if (displayItems.isEmpty()) return
 
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    // 固定卡片的高度
-    val wallHeight = 200.dp
+    val cardSize = 72.dp
+    val wallHeight = 220.dp
 
-    // 初始化位置（让它们错落排开）
-    val nodes = remember(displayItems) {
-        displayItems.mapIndexed { index, tea ->
-            val x = when (index % 3) {
-                0 -> 20f
-                1 -> screenWidth.value / 2 - 30f
-                else -> screenWidth.value - 80f
-            }
-            val y = when (index % 2) {
-                0 -> 40f
-                else -> 100f
-            }
-            StickerNode(
-                tea = tea,
-                initialOffset = Offset(x, y),
-                rotation = Random.nextFloat() * 16f - 8f // 随机 -8度 到 8度
-            )
-        }
-    }
-
-    Box(
+    // 使用 BoxWithConstraints 获取宽高用于限制拖拽边界
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(wallHeight)
             .clip(RoundedCornerShape(24.dp))
             .background(Color(0xFFE6E8E0))
     ) {
+        val maxX = constraints.maxWidth - cardSize.toPx()
+        val maxY = constraints.maxHeight - cardSize.toPx()
+
+        val nodes = remember(displayItems, maxX, maxY) {
+            displayItems.mapIndexed { index, tea ->
+                // 随机初始位置，确保在框内
+                val x = Random.nextFloat() * (maxX * 0.7f)
+                val y = Random.nextFloat() * (maxY * 0.7f)
+                StickerNode(
+                    tea = tea,
+                    initialOffset = Offset(x, y),
+                    rotation = Random.nextFloat() * 16f - 8f
+                )
+            }
+        }
+
         nodes.forEachIndexed { index, node ->
-            DraggableStickerItem(node = node, index = index, wallHeight = wallHeight)
+            DraggableStickerItem(
+                node = node,
+                index = index,
+                cardSize = cardSize,
+                maxX = maxX,
+                maxY = maxY
+            )
         }
     }
 }
 
 @Composable
-private fun DraggableStickerItem(node: StickerNode, index: Int, wallHeight: androidx.compose.ui.unit.Dp) {
-    // 使用 Animatable 记录 Y 轴的掉落动画
-    val animY = remember { Animatable(-600f) }
-    
-    // 首次进入，错开时间掉落
+private fun DraggableStickerItem(
+    node: StickerNode,
+    index: Int,
+    cardSize: androidx.compose.ui.unit.Dp,
+    maxX: Float,
+    maxY: Float
+) {
+    // 掉落动画
+    val animY = remember { Animatable(-400f) }
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(index * 150L)
+        kotlinx.coroutines.delay(index * 100L)
         animY.animateTo(
-            targetValue = node.offset.y,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
+            targetValue = node.offsetY,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
         )
     }
 
-    // 当手指拖动时，实时更新坐标
     var dragOffsetX by remember { mutableStateOf(0f) }
     var dragOffsetY by remember { mutableStateOf(0f) }
 
     Box(
         modifier = Modifier
-            .zIndex(if (node.isDragging) 10f else 1f) // 拖拽时置顶
+            .zIndex(if (node.isDragging) 10f else 1f)
             .offset {
-                // 掉落动画中，Y轴用 animY；如果掉落完成，用拖拽偏移量
-                val currentX = if (animY.isRunning) node.offset.x else node.offset.x + dragOffsetX
-                val currentY = if (animY.isRunning) animY.value else node.offset.y + dragOffsetY
-                IntOffset(currentX.roundToInt(), currentY.roundToInt())
+                // 如果在掉落中，用动画值；掉落完毕后，用持久化的值+拖拽值
+                val curX = if (animY.isRunning) node.offsetX else (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
+                val curY = if (animY.isRunning) animY.value else (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
+                IntOffset(curX.roundToInt(), curY.roundToInt())
             }
-            .size(72.dp) // 👈 固定卡片大小 72x72
+            .size(cardSize)
             .rotate(node.rotation)
-            .pointerInput(Unit) {
+            .pointerInput(node) {
                 detectDragGestures(
                     onDragStart = { node.isDragging = true },
                     onDragEnd = { 
                         node.isDragging = false
-                        // 拖拽结束时，把最终位置保存下来
-                        node.offset = Offset(node.offset.x + dragOffsetX, node.offset.y + dragOffsetY)
+                        // 拖拽结束：将偏移量永久保存，并重置拖动临时变量
+                        node.offsetX = (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
+                        node.offsetY = (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
                         dragOffsetX = 0f
                         dragOffsetY = 0f
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        dragOffsetX += dragAmount.x
-                        dragOffsetY += dragAmount.y
+                        // 实时限制拖拽不超出边界
+                        val newDragX = dragOffsetX + dragAmount.x
+                        val newDragY = dragOffsetY + dragAmount.y
+                        dragOffsetX = newDragX.coerceIn(-node.offsetX, maxX - node.offsetX)
+                        dragOffsetY = newDragY.coerceIn(-node.offsetY, maxY - node.offsetY)
                     }
                 )
             }
@@ -303,6 +361,144 @@ private fun DraggableStickerItem(node: StickerNode, index: Int, wallHeight: andr
     }
 }
 
+// ================= 完美还原图三的日历卡片 =================
+@Composable
+private fun CalendarCard(
+    currentMonth: Calendar,
+    onMonthChange: (Calendar) -> Unit,
+    monthItems: List<Drink>,
+    dayRecords: Map<Int, List<Drink>>,
+    selectedDay: Int,
+    onSelectDay: (Int) -> Unit
+) {
+    val year = currentMonth.get(Calendar.YEAR)
+    val month = currentMonth.get(Calendar.MONTH)
+    val totalSpend = monthItems.sumOf { it.price }
+    val totalCups = monthItems.size
+    val totalBrands = monthItems.map { it.brand }.distinct().size
+
+    val firstDay = currentMonth.clone() as Calendar
+    firstDay.set(Calendar.DAY_OF_MONTH, 1)
+    val leading = (firstDay.get(Calendar.DAY_OF_WEEK) + 5) % 7 // 周一为第一天
+    val daysInMonth = currentMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+    val today = Calendar.getInstance()
+
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(20.dp)
+    ) {
+        // 年月切换
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "${year}年${month + 1}月", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Row {
+                Icon(Icons.Default.KeyboardArrowLeft, "上个月", modifier = Modifier.size(28.dp).clip(CircleShape).clickable { 
+                    val c = currentMonth.clone() as Calendar; c.add(Calendar.MONTH, -1); onMonthChange(c) 
+                })
+                Spacer(Modifier.width(16.dp))
+                Icon(Icons.Default.KeyboardArrowRight, "下个月", modifier = Modifier.size(28.dp).clip(CircleShape).clickable { 
+                    val c = currentMonth.clone() as Calendar; c.add(Calendar.MONTH, 1); onMonthChange(c) 
+                })
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // 三个统计框（带虚线分割）
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF8F9FA)).padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StatCol("该月消费", "¥${formatMoney(totalSpend)}")
+            Box(modifier = Modifier.width(1.dp).height(30.dp).background(Color(0xFFE0E0E0)))
+            StatCol("该月杯数", "${totalCups} 杯")
+            Box(modifier = Modifier.width(1.dp).height(30.dp).background(Color(0xFFE0E0E0)))
+            StatCol("该月品牌", "${totalBrands} 个")
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // 星期表头
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+            listOf("日", "一", "二", "三", "四", "五", "六").forEach { label ->
+                Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+            }
+        }
+
+        // 日期网格
+        val cells = leading + daysInMonth
+        val rows = (cells + 6) / 7
+        repeat(rows) { row ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                repeat(7) { col ->
+                    val index = row * 7 + col
+                    val day = index - leading + 1
+                    Box(modifier = Modifier.weight(1f).aspectRatio(1f).padding(4.dp), contentAlignment = Alignment.Center) {
+                        if (day in 1..daysInMonth) {
+                            val drinks = dayRecords[day]
+                            val isSelected = day == selectedDay
+                            val isToday = day == today.get(Calendar.DAY_OF_MONTH) && month == today.get(Calendar.MONTH)
+
+                            Box(
+                                modifier = Modifier.fillMaxSize()
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) Color(0xFFF0F0F0) else Color.Transparent)
+                                    .clickable { onSelectDay(day) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (!drinks.isNullOrEmpty()) {
+                                    // 有记录：显示品牌图标
+                                    val brand = Catalog.brandOf(drinks.first().brand)
+                                    BrandBadge(
+                                        badge = brand.badge,
+                                        color = Color(brand.color),
+                                        size = 32.dp,
+                                        logo = brand.logo,
+                                        squircle = Catalog.isSquircle(brand.name)
+                                    )
+                                } else {
+                                    // 无记录：显示数字
+                                    Text(
+                                        text = day.toString(),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = if (isToday) Caramel else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // 回到今天按钮
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).border(1.dp, Color(0xFFF0F0F0), RoundedCornerShape(50)).clickable {
+                    val c = Calendar.getInstance()
+                    onMonthChange(c)
+                    onSelectDay(c.get(Calendar.DAY_OF_MONTH))
+                }.padding(horizontal = 20.dp, vertical = 8.dp)
+            ) {
+                Text("回到今天", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatCol(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, fontSize = 12.sp, color = PearlSoft)
+        Spacer(Modifier.height(4.dp))
+        Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+    }
+}
+
+// ================= 保留原有组件 =================
 @Composable
 private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
     val brand = Catalog.brandOf(tea.brand)
@@ -315,7 +511,6 @@ private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
         ) {
             Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
                 StickerImage(tea = tea, modifier = Modifier.fillMaxSize())
-                
                 Box(modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp).background(Color.White, CircleShape).padding(2.dp)) {
                     BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
                 }
