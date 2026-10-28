@@ -612,38 +612,64 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 👇 将整个容器缩小为 64dp，作为绝对尺寸的参照物
-                Box(modifier = Modifier.size(64.dp), contentAlignment = Alignment.Center) {
+                // 图片区域
+                Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
                     
                     if (tea.photoPath != null) {
-                        // 👇 抠图：使用 Crop 裁剪掉透明留白，让它撑满
-                        LocalPhoto(
-                            file = PhotoStore.fileOf(tea.photoPath),
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize() // 强制填满 64dp
-                        )
+                        val file = PhotoStore.fileOf(tea.photoPath)
+                        // 加载图片为 Bitmap 以实现白边叠加
+                        val bitmap = remember(file) { 
+                            android.graphics.BitmapFactory.decodeFile(file.absolutePath) 
+                        }
+                        
+                        if (bitmap != null) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                // 1. 底层：放大一圈的纯白剪影（白边效果）
+                                androidx.compose.foundation.Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White),
+                                    modifier = Modifier.fillMaxSize().scale(1.08f), // 放大产生边框
+                                    contentScale = ContentScale.Fit
+                                )
+                                // 2. 顶层：原透明图
+                                androidx.compose.foundation.Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                        } else {
+                            // 兜底：如果图片解码失败
+                            LocalPhoto(
+                                file = file,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     } else {
-                        // 👇 预设图：使用 Fit 保证线稿不被切边
+                        // 没有抠图，显示预设线稿图
                         Image(
                             painter = painterResource(id = getDrinkIconRes(tea)),
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize().padding(6.dp), // 留一点边距防裁切
+                            modifier = Modifier.fillMaxSize().padding(6.dp),
                             contentScale = ContentScale.Fit
                         )
                     }
                     
-                    // 👇 品牌 Logo：加白色圆形底座，绝对锁定在右下角
+                    // 品牌 Logo (白色底座，右下角悬浮)
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .offset(x = 4.dp, y = 4.dp)
+                            .offset(x = 2.dp, y = 2.dp)
                             .background(Color.White, CircleShape)
                             .padding(2.dp)
                     ) {
                         BrandBadge(
                             badge = brand.badge,
                             color = Color(brand.color),
-                            size = 20.dp, // 尺寸微调，显得更精致
+                            size = 20.dp,
                             logo = brand.logo,
                             squircle = Catalog.isSquircle(brand.name)
                         )
@@ -652,14 +678,12 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
 
                 Spacer(Modifier.width(16.dp))
 
-                // ================= 右侧文字区域 =================
+                // 右侧文字区域
                 Column(modifier = Modifier.weight(1f)) {
-                    
-                    // 第一行：品名 + 日期
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = displayName,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium, // 调整了一下字号，更贴近图一
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -671,19 +695,17 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
                                 .background(Color(0xFFF4F5F0))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = TimeUtil.dayLabel(tea.timestamp),
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = PearlSoft
                             )
                         }
                     }
                     
-                    Spacer(Modifier.height(4.dp))
-                    
-                    // 第二行：品牌名
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         text = tea.brand.ifBlank { "未知品牌" },
                         style = MaterialTheme.typography.bodyMedium,
@@ -692,34 +714,31 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                         overflow = TextOverflow.Ellipsis
                     )
                     
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
+                    RatingStars(rating = tea.rating, starSize = 14.dp)
                     
-                    // 第三行：评分
-                    RatingStars(rating = tea.rating, starSize = 16.dp)
-                    
-                    // 第四行：标签
                     val tags = mutableListOf<String>()
                     if (tea.sugar.isNotBlank()) tags.add(tea.sugar)
                     if (tea.ice.isNotBlank()) tags.add(tea.ice)
                     if (tea.toppings.isNotEmpty()) tags.addAll(tea.toppings)
 
                     if (tags.isNotEmpty()) {
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(8.dp))
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             tags.forEach { tag ->
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(50))
-                                        .border(1.dp, Color(0xFFE5E5E5), RoundedCornerShape(50))
+                                        .border(0.5.dp, Color(0xFFE0E0E0), RoundedCornerShape(50))
                                         .background(Color.White)
-                                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
                                     Text(
                                         text = tag,
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
@@ -732,7 +751,6 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
         }
     }
 }
-
 @Composable
 private fun EmptyHint(onRecord: () -> Unit) {
     Column(
