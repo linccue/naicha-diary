@@ -4,7 +4,6 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,18 +26,15 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.naicha.diary.R
 import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.Drink
-import com.naicha.diary.data.DrinkCategory
 import com.naicha.diary.ui.components.*
 import com.naicha.diary.ui.theme.*
 import com.naicha.diary.util.PhotoStore
@@ -77,7 +73,6 @@ fun WallScreen(
         )
 
         Column(modifier = Modifier.fillMaxSize()) {
-            // ======== 顶部标题与切换标签（保留原样） ========
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -127,7 +122,6 @@ fun WallScreen(
                 }
             }
 
-            // ======== 内容区域 ========
             when (mode) {
                 WallMode.Wall -> StickerWallView(items = sorted, onOpenDetail = onOpenDetail)
                 WallMode.Brand -> BrandRank(items = sorted)
@@ -147,7 +141,6 @@ fun WallScreen(
     }
 }
 
-// ================= 改造后的饮品墙：贴纸墙 + 日期分组 =================
 @Composable
 private fun StickerWallView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
     if (items.isEmpty()) {
@@ -157,7 +150,6 @@ private fun StickerWallView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
         return
     }
 
-    // 按日期分组
     val groupedItems = remember(items) {
         items.groupBy { SimpleDateFormat("dd日 EEEE", Locale.CHINA).format(Date(it.timestamp)) }
     }
@@ -167,12 +159,10 @@ private fun StickerWallView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 1. 顶部贴纸墙
         item {
             StickerDisplayWall(items)
         }
 
-        // 2. 按日期分组的列表
         groupedItems.forEach { (dateStr, dayItems) ->
             item {
                 Row(
@@ -180,17 +170,9 @@ private fun StickerWallView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Text(text = dateStr, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     Text(
-                        text = dateStr,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = "${dayItems.size} 杯",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = PearlSoft,
+                        text = "${dayItems.size} 杯", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PearlSoft,
                         modifier = Modifier.background(Color.White, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -203,7 +185,6 @@ private fun StickerWallView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
     }
 }
 
-// 顶部错落贴纸墙
 @Composable
 private fun StickerDisplayWall(items: List<Drink>) {
     val displayItems = remember(items) { items.take(8) }
@@ -229,7 +210,6 @@ private fun StickerDisplayWall(items: List<Drink>) {
     }
 }
 
-// 列表项
 @Composable
 private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
     val brand = Catalog.brandOf(tea.brand)
@@ -279,7 +259,6 @@ private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
     }
 }
 
-// ================= 核心白边贴纸组件 =================
 @Composable
 fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
     val defaultBitmap = if (tea.photoPath == null) ImageBitmap.imageResource(id = getDrinkIconRes(tea)) else null
@@ -345,43 +324,6 @@ fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
         )
     }
 }
-
-// 裁剪透明边缘
-fun trimTransparentEdges(bitmap: android.graphics.Bitmap): android.graphics.Bitmap {
-    var top = bitmap.height; var bottom = 0; var left = bitmap.width; var right = 0
-    val pixels = IntArray(bitmap.width * bitmap.height)
-    bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-    for (y in 0 until bitmap.height) {
-        for (x in 0 until bitmap.width) {
-            val alpha = (pixels[y * bitmap.width + x] shr 24) and 0xff
-            if (alpha > 10) {
-                if (x < left) left = x; if (x > right) right = x; if (y < top) top = y; if (y > bottom) bottom = y
-            }
-        }
-    }
-    return if (top < bottom && left < right) android.graphics.Bitmap.createBitmap(bitmap, left, top, right - left + 1, bottom - top + 1) else bitmap
-}
-
-// 预设图片匹配
-fun getDrinkIconRes(tea: Drink): Int {
-    val isHot = tea.ice.contains("热") || tea.ice.contains("常温")
-    if (tea.brand in listOf("瑞幸咖啡", "星巴克", "库迪咖啡", "Manner", "M Stand", "Tims", "Peet's", "挪瓦咖啡", "幸运咖")) {
-        return if (isHot) R.drawable.drink_coffee_hot else R.drawable.drink_coffee_cold
-    }
-    val category = DrinkCategory.of(tea.category)
-    return when (category) {
-        DrinkCategory.MilkTea -> if (isHot) R.drawable.drink_milk_tea_hot else R.drawable.drink_milk_tea_cold
-        DrinkCategory.Coffee -> if (isHot) R.drawable.drink_coffee_hot else R.drawable.drink_coffee_cold
-        DrinkCategory.FruitTea -> R.drawable.drink_fruit_tea
-        DrinkCategory.LemonTea -> R.drawable.drink_lemon_tea
-        DrinkCategory.PureTea -> R.drawable.drink_pure_tea
-        DrinkCategory.Bottled -> R.drawable.drink_bottle
-        DrinkCategory.Alcohol -> R.drawable.drink_alcohol
-        else -> R.drawable.drink_general
-    }
-}
-
-// ================= 原有保留组件（品牌榜、时间轴） =================
 
 @Composable
 private fun BrandRank(items: List<Drink>) {
@@ -487,5 +429,3 @@ private fun TimelineRow(tea: Drink, onClick: () -> Unit) {
         }
     }
 }
-
-fun formatMoney(value: Double): String = if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.CHINA, "%.1f", value)
