@@ -105,7 +105,7 @@ fun HomeScreen(
                 val counts = items.groupingBy { it.brand + it.name }.eachCount()
                 result = result.filter { counts[it.brand + it.name] ?: 0 > 3 }
             }
-            "心头好" -> result = result.filter { it.rating == 5 }
+            "心头好" -> result = result.filter { it.rating == 5f }
             "本月" -> result = result.filter { mItem -> monthItems.any { it.id == mItem.id } }
             "本周" -> {
                 val cal = Calendar.getInstance()
