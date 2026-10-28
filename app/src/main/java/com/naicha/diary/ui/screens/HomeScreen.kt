@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,16 +28,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.naicha.diary.R
@@ -345,17 +349,69 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                         }
                         
                         if (bitmap != null) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                Image(
-                                    bitmap = bitmap.asImageBitmap(), contentDescription = null,
-                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White),
-                                    modifier = Modifier.fillMaxSize().scale(1.15f), // 1.15 放大白边
-                                    contentScale = ContentScale.Fit
+                            val imageBitmap = bitmap.asImageBitmap()
+                            
+                            // 👇 用 Canvas 保证均匀白边
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val imgWidth = imageBitmap.width.toFloat()
+                                val imgHeight = imageBitmap.height.toFloat()
+                                
+                                val canvasRatio = size.width / size.height
+                                val imgRatio = imgWidth / imgHeight
+                                
+                                val drawWidth: Float
+                                val drawHeight: Float
+                                if (canvasRatio > imgRatio) {
+                                    drawHeight = size.height
+                                    drawWidth = drawHeight * imgRatio
+                                } else {
+                                    drawWidth = size.width
+                                    drawHeight = drawWidth / imgRatio
+                                }
+                                
+                                val dx = (size.width - drawWidth) / 2f
+                                val dy = (size.height - drawHeight) / 2f
+                                
+                                val dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt())
+                                val dstOffset = IntOffset(dx.toInt(), dy.toInt())
+                                
+                                // 白边厚度 2dp
+                                val strokePx = 2.dp.toPx().toInt()
+                                
+                                // 八个方向的偏移
+                                val offsets = listOf(
+                                    IntOffset(-strokePx, -strokePx),
+                                    IntOffset(0, -strokePx),
+                                    IntOffset(strokePx, -strokePx),
+                                    IntOffset(-strokePx, 0),
+                                    IntOffset(strokePx, 0),
+                                    IntOffset(-strokePx, strokePx),
+                                    IntOffset(0, strokePx),
+                                    IntOffset(strokePx, strokePx)
                                 )
-                                Image(
-                                    bitmap = bitmap.asImageBitmap(), contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Fit
+                                
+                                // 画 8 个方向的纯白底影
+                                offsets.forEach { offset ->
+                                    drawImage(
+                                        image = imageBitmap,
+                                        srcOffset = IntOffset.Zero,
+                                        srcSize = IntSize(imageBitmap.width, imageBitmap.height),
+                                        dstOffset = IntOffset(dstOffset.x + offset.x, dstOffset.y + offset.y),
+                                        dstSize = dstSize,
+                                        colorFilter = ColorFilter.tint(Color.White),
+                                        filterQuality = FilterQuality.High
+                                    )
+                                }
+                                
+                                // 叠原图
+                                drawImage(
+                                    image = imageBitmap,
+                                    srcOffset = IntOffset.Zero,
+                                    srcSize = IntSize(imageBitmap.width, imageBitmap.height),
+                                    dstOffset = dstOffset,
+                                    dstSize = dstSize,
+                                    colorFilter = null,
+                                    filterQuality = FilterQuality.High
                                 )
                             }
                         } else {
@@ -422,7 +478,6 @@ private fun EmptyHint(onRecord: () -> Unit) {
 
 fun formatMoney(value: Double): String = if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.CHINA, "%.1f", value)
 
-// 裁剪透明边缘
 fun trimTransparentEdges(bitmap: android.graphics.Bitmap): android.graphics.Bitmap {
     var top = bitmap.height; var bottom = 0; var left = bitmap.width; var right = 0
     val pixels = IntArray(bitmap.width * bitmap.height)
@@ -438,7 +493,6 @@ fun trimTransparentEdges(bitmap: android.graphics.Bitmap): android.graphics.Bitm
     return if (top < bottom && left < right) android.graphics.Bitmap.createBitmap(bitmap, left, top, right - left + 1, bottom - top + 1) else bitmap
 }
 
-// 预设图片匹配
 fun getDrinkIconRes(tea: Drink): Int {
     val isHot = tea.ice.contains("热") || tea.ice.contains("常温")
     if (tea.brand in listOf("瑞幸咖啡", "星巴克", "库迪咖啡", "Manner", "M Stand", "Tims", "Peet's", "挪瓦咖啡", "幸运咖")) {
