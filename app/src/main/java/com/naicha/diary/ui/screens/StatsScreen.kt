@@ -39,8 +39,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     val totalCalories = remember(items) { items.sumOf { it.calories } }
     val avgPrice = if (total == 0) 0.0 else totalSpend / total
     val streak = remember(items) { currentStreak(items) }
-    val avgRating = if (total == 0) 0f else items.sumOf { it.rating } / total
-
+    val avgRating = if (total == 0) 0f else items.map { it.rating }.sum() / total
     Box(modifier.fillMaxSize()) {
         PearlField(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F5F0)), count = 12, seed = 23)
 
