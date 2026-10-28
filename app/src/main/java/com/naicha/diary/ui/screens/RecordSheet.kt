@@ -90,8 +90,6 @@ fun RecordSheet(
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var aiLoading by remember { mutableStateOf(false) }
     var aiMessage by remember { mutableStateOf<String?>(null) }
-    
-    // 控制是否显示内置相机
     var showInAppCamera by remember { mutableStateOf(false) }
 
     val brandColor = remember(brand, category) {
@@ -145,7 +143,6 @@ fun RecordSheet(
         if (aiImage != null) { runRecognize(aiImage); onAiImageConsumed() }
     }
 
-    // 处理相册选图和系统相机拍图的回调
     LaunchedEffect(photoImage) {
         if (photoImage != null) {
             isSegmenting = true
@@ -190,41 +187,8 @@ fun RecordSheet(
         label = "sheetBackground",
     )
 
-    // 👇 核心大括号起始：如果打开了内置相机，显示相机；否则显示表单
-    if (showInAppCamera) {
-        CameraCapture(
-            onPhotoCaptured = { bitmap ->
-                showInAppCamera = false
-                isSegmenting = true
-                scope.launch {
-                    try {
-                        val savedFile = PhotoStore.fileOf("photo_${System.currentTimeMillis()}.jpg")
-                        withContext(Dispatchers.IO) {
-                            FileOutputStream(savedFile).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                        }
-                        photoName = savedFile.name
-                        previewBitmap = bitmap
-
-                        withContext(Dispatchers.IO) {
-                            try {
-                                U2NetSegmenter.init(context)
-                                val result = U2NetSegmenter.removeBackground(bitmap)
-                                if (result != null) {
-                                    withContext(Dispatchers.Main) { previewBitmap = result }
-                                    val newFile = PhotoStore.fileOf("seg_${savedFile.nameWithoutExtension}.png")
-                                    FileOutputStream(newFile).use { result.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                                    photoName = newFile.name
-                                }
-                            } catch (e: Exception) { e.printStackTrace() }
-                        }
-                    } catch (e: Exception) { e.printStackTrace() } finally {
-                        isSegmenting = false
-                    }
-                }
-            },
-            onCancel = { showInAppCamera = false }
-        )
-    } else {
+    // 👇 核心大括号起始：把弹窗和相机放在同一个 Box 里，保留滚动位置
+    Box(modifier = Modifier.fillMaxSize()) {
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = sheetState,
@@ -375,7 +339,6 @@ fun RecordSheet(
                                 if (!isSegmenting) {
                                     PhotoButton(text = "相册", emoji = "🖼") { onPick(false, false) }
                                     Spacer(Modifier.width(10.dp))
-                                    // 👇 这里将调起内置相机
                                     PhotoButton(text = "拍照", emoji = "📷") { showInAppCamera = true }
                                     if (photoName != null) {
                                         Spacer(Modifier.width(10.dp))
@@ -448,7 +411,42 @@ fun RecordSheet(
             }
         }
 
-        // 👇 弹窗写在 else 分支里面，确保作用域正确
+        // 相机悬浮在最上面
+        if (showInAppCamera) {
+            CameraCapture(
+                onPhotoCaptured = { bitmap ->
+                    showInAppCamera = false
+                    isSegmenting = true
+                    scope.launch {
+                        try {
+                            val savedFile = PhotoStore.fileOf("photo_${System.currentTimeMillis()}.jpg")
+                            withContext(Dispatchers.IO) {
+                                FileOutputStream(savedFile).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                            }
+                            photoName = savedFile.name
+                            previewBitmap = bitmap
+
+                            withContext(Dispatchers.IO) {
+                                try {
+                                    U2NetSegmenter.init(context)
+                                    val result = U2NetSegmenter.removeBackground(bitmap)
+                                    if (result != null) {
+                                        withContext(Dispatchers.Main) { previewBitmap = result }
+                                        val newFile = PhotoStore.fileOf("seg_${savedFile.nameWithoutExtension}.png")
+                                        FileOutputStream(newFile).use { result.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                                        photoName = newFile.name
+                                    }
+                                } catch (e: Exception) { e.printStackTrace() }
+                            }
+                        } catch (e: Exception) { e.printStackTrace() } finally {
+                            isSegmenting = false
+                        }
+                    }
+                },
+                onCancel = { showInAppCamera = false }
+            )
+        }
+
         if (showDatePicker) {
             val datePickerState = rememberDatePickerState(initialSelectedDateMillis = timestampToDatePickerMillis(selectedDate))
             DatePickerDialog(
