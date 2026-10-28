@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -87,7 +88,6 @@ fun WallScreen(
         )
 
         Column(modifier = Modifier.fillMaxSize()) {
-            // 顶部标题与切换
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -156,17 +156,14 @@ fun WallScreen(
     }
 }
 
-// ================= 饮品墙模式 =================
 @Composable
 private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
-    // 日历状态
     var currentMonth by remember { mutableStateOf(Calendar.getInstance()) }
     var selectedDay by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH)) }
 
     val year = currentMonth.get(Calendar.YEAR)
     val month = currentMonth.get(Calendar.MONTH)
     
-    // 过滤出当前月的数据
     val monthItems = remember(items, year, month) {
         items.filter {
             val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
@@ -174,7 +171,6 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
         }
     }
     
-    // 按天分组
     val dayRecords = remember(monthItems) {
         monthItems.groupBy {
             Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.DAY_OF_MONTH)
@@ -188,18 +184,16 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 1. 顶部贴纸墙
         item {
             DraggableStickerWall(items)
         }
 
-        // 2. 日历卡片
         item {
             CalendarCard(
                 currentMonth = currentMonth,
                 onMonthChange = { 
                     currentMonth = it 
-                    selectedDay = 1 // 切换月份时重置选中天
+                    selectedDay = 1 
                 },
                 monthItems = monthItems,
                 dayRecords = dayRecords,
@@ -208,7 +202,6 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
             )
         }
 
-        // 3. 选中日期的记录列表头部
         item {
             val dateStr = SimpleDateFormat("d日 EEEE", Locale.CHINA).format(
                 Calendar.getInstance().apply {
@@ -230,7 +223,6 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
             }
         }
 
-        // 4. 选中日期的具体记录
         if (selectedDayRecords.isEmpty()) {
             item {
                 Box(
@@ -248,7 +240,6 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
     }
 }
 
-// ================= 修复边界限制的拖拽贴纸墙 =================
 class StickerNode(
     val tea: Drink,
     initialOffset: Offset,
@@ -266,8 +257,8 @@ private fun DraggableStickerWall(items: List<Drink>) {
 
     val cardSize = 72.dp
     val wallHeight = 220.dp
+    val density = LocalDensity.current // 👈 新增密度获取
 
-    // 使用 BoxWithConstraints 获取宽高用于限制拖拽边界
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
@@ -275,12 +266,11 @@ private fun DraggableStickerWall(items: List<Drink>) {
             .clip(RoundedCornerShape(24.dp))
             .background(Color(0xFFE6E8E0))
     ) {
-        val maxX = constraints.maxWidth - cardSize.toPx()
-        val maxY = constraints.maxHeight - cardSize.toPx()
+        val maxX = constraints.maxWidth - with(density) { cardSize.toPx() } // 👈 使用 density 转换
+        val maxY = constraints.maxHeight - with(density) { cardSize.toPx() } // 👈 使用 density 转换
 
         val nodes = remember(displayItems, maxX, maxY) {
             displayItems.mapIndexed { index, tea ->
-                // 随机初始位置，确保在框内
                 val x = Random.nextFloat() * (maxX * 0.7f)
                 val y = Random.nextFloat() * (maxY * 0.7f)
                 StickerNode(
@@ -311,7 +301,6 @@ private fun DraggableStickerItem(
     maxX: Float,
     maxY: Float
 ) {
-    // 掉落动画
     val animY = remember { Animatable(-400f) }
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(index * 100L)
@@ -328,7 +317,6 @@ private fun DraggableStickerItem(
         modifier = Modifier
             .zIndex(if (node.isDragging) 10f else 1f)
             .offset {
-                // 如果在掉落中，用动画值；掉落完毕后，用持久化的值+拖拽值
                 val curX = if (animY.isRunning) node.offsetX else (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
                 val curY = if (animY.isRunning) animY.value else (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
                 IntOffset(curX.roundToInt(), curY.roundToInt())
@@ -340,7 +328,6 @@ private fun DraggableStickerItem(
                     onDragStart = { node.isDragging = true },
                     onDragEnd = { 
                         node.isDragging = false
-                        // 拖拽结束：将偏移量永久保存，并重置拖动临时变量
                         node.offsetX = (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
                         node.offsetY = (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
                         dragOffsetX = 0f
@@ -348,7 +335,6 @@ private fun DraggableStickerItem(
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        // 实时限制拖拽不超出边界
                         val newDragX = dragOffsetX + dragAmount.x
                         val newDragY = dragOffsetY + dragAmount.y
                         dragOffsetX = newDragX.coerceIn(-node.offsetX, maxX - node.offsetX)
@@ -361,7 +347,6 @@ private fun DraggableStickerItem(
     }
 }
 
-// ================= 完美还原图三的日历卡片 =================
 @Composable
 private fun CalendarCard(
     currentMonth: Calendar,
@@ -379,7 +364,7 @@ private fun CalendarCard(
 
     val firstDay = currentMonth.clone() as Calendar
     firstDay.set(Calendar.DAY_OF_MONTH, 1)
-    val leading = (firstDay.get(Calendar.DAY_OF_WEEK) + 5) % 7 // 周一为第一天
+    val leading = (firstDay.get(Calendar.DAY_OF_WEEK) + 5) % 7
     val daysInMonth = currentMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
 
     val today = Calendar.getInstance()
@@ -387,7 +372,6 @@ private fun CalendarCard(
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(20.dp)
     ) {
-        // 年月切换
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(text = "${year}年${month + 1}月", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Row {
@@ -403,7 +387,6 @@ private fun CalendarCard(
 
         Spacer(Modifier.height(16.dp))
 
-        // 三个统计框（带虚线分割）
         Row(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF8F9FA)).padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -418,14 +401,12 @@ private fun CalendarCard(
 
         Spacer(Modifier.height(20.dp))
 
-        // 星期表头
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             listOf("日", "一", "二", "三", "四", "五", "六").forEach { label ->
                 Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
             }
         }
 
-        // 日期网格
         val cells = leading + daysInMonth
         val rows = (cells + 6) / 7
         repeat(rows) { row ->
@@ -447,7 +428,6 @@ private fun CalendarCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (!drinks.isNullOrEmpty()) {
-                                    // 有记录：显示品牌图标
                                     val brand = Catalog.brandOf(drinks.first().brand)
                                     BrandBadge(
                                         badge = brand.badge,
@@ -457,7 +437,6 @@ private fun CalendarCard(
                                         squircle = Catalog.isSquircle(brand.name)
                                     )
                                 } else {
-                                    // 无记录：显示数字
                                     Text(
                                         text = day.toString(),
                                         style = MaterialTheme.typography.titleMedium,
@@ -474,7 +453,6 @@ private fun CalendarCard(
         
         Spacer(Modifier.height(16.dp))
         
-        // 回到今天按钮
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).border(1.dp, Color(0xFFF0F0F0), RoundedCornerShape(50)).clickable {
@@ -498,7 +476,6 @@ private fun StatCol(label: String, value: String) {
     }
 }
 
-// ================= 保留原有组件 =================
 @Composable
 private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
     val brand = Catalog.brandOf(tea.brand)
