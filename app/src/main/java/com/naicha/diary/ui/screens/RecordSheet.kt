@@ -79,7 +79,7 @@ fun RecordSheet(
     var ice by remember { mutableStateOf(initial?.ice ?: "") }
     var toppings by remember { mutableStateOf(initial?.toppings ?: emptyList()) }
     var priceText by remember { mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "") }
-    var rating by remember { mutableFloatStateOf(initial?.rating ?: 0) }
+    var rating by remember { mutableStateOf(initial?.rating ?: 0) }
     var mood by remember { mutableStateOf(initial?.mood ?: "") }
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var photoName by remember { mutableStateOf(initial?.photoPath) }
@@ -548,7 +548,7 @@ private fun BrandChip(brand: Brand, selected: Boolean, onClick: () -> Unit, modi
 private fun SheetHandle() { Box(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) { Box(modifier = Modifier.width(44.dp).height(5.dp).clip(CircleShape).background(Outline)) } }
 
 @Composable
-private fun PreviewRow(liquid: Color, straw: Color, style: CupStyle, toppingCount: Int, brand: String, name: String, cupSize: String, sugar: String, rating: Int, mood: String, aiLoading: Boolean, onAiCamera: () -> Unit, onAiGallery: () -> Unit) {
+private fun PreviewRow(liquid: Color, straw: Color, style: CupStyle, toppingCount: Int, brand: String, name: String, cupSize: String, sugar: String, rating: Float, mood: String, aiLoading: Boolean, onAiCamera: () -> Unit, onAiGallery: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(Brush.horizontalGradient(listOf(straw.copy(alpha = 0.14f), MaterialTheme.colorScheme.surfaceContainerLow))).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             DrinkCup(modifier = Modifier.width(78.dp).height(100.dp), liquidColor = liquid, strawColor = straw, toppingCount = toppingCount, style = style)
