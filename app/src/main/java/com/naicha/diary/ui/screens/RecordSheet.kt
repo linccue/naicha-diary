@@ -79,7 +79,7 @@ fun RecordSheet(
     var ice by remember { mutableStateOf(initial?.ice ?: "") }
     var toppings by remember { mutableStateOf(initial?.toppings ?: emptyList()) }
     var priceText by remember { mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "") }
-    var rating by remember { mutableIntStateOf(initial?.rating ?: 0) }
+    var rating by remember { mutableFloatStateOf(initial?.rating ?: 0) }
     var mood by remember { mutableStateOf(initial?.mood ?: "") }
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var photoName by remember { mutableStateOf(initial?.photoPath) }
