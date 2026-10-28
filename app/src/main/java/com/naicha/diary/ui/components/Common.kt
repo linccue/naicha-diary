@@ -121,30 +121,68 @@ fun TagChip(
 
 @Composable
 fun RatingStars(
-    rating: Int,
+    rating: Float,
     modifier: Modifier = Modifier,
-    starSize: Dp = 22.dp,
-    accent: Color = Color(0xFFFFB300),
-    onRate: ((Int) -> Unit)? = null,
+    starSize: Dp = 20.dp,
+    onRate: ((Float) -> Unit)? = null,
 ) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        (1..5).forEach { index ->
-            StarShape(
-                filled = index <= rating,
-                color = accent,
+    Row(modifier = modifier) {
+        for (i in 1..5) {
+            val starRating = i.toFloat()
+            val isHalf = rating == starRating - 0.5f
+            val isFull = rating >= starRating
+
+            Box(
                 modifier = Modifier
                     .size(starSize)
                     .then(
-                        if (onRate != null) Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { onRate(index) } else Modifier
+                        if (onRate != null) {
+                            Modifier.pointerInput(Unit) {
+                                detectTapGestures { offset ->
+                                    // 点击左半边=半星，点击右半边=整星
+                                    if (offset.x < size.width / 2) {
+                                        onRate(starRating - 0.5f)
+                                    } else {
+                                        onRate(starRating)
+                                    }
+                                }
+                            }
+                        } else Modifier
                     ),
-            )
-            if (index != 5) Spacer(Modifier.width(2.dp))
+                contentAlignment = Alignment.Center
+            ) {
+                // 底层：空心星星
+                Icon(
+                    imageVector = Icons.Default.StarBorder,
+                    contentDescription = null,
+                    tint = Color(0xFFE0E0E0), // 空星的颜色
+                    modifier = Modifier.fillMaxSize()
+                )
+                
+                // 顶层：实心星星（根据评分显示全星、半星或隐藏）
+                if (isFull || isHalf) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFC107), // 金色的星
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(if (isHalf) Modifier.clipToHalf() else Modifier)
+                    )
+                }
+            }
         }
     }
 }
+
+// 辅助函数：裁剪出左半边
+fun Modifier.clipToHalf(): Modifier = this.then(
+    Modifier.drawWithContent {
+        clipRect(right = size.width / 2f) {
+            this@drawWithContent.drawContent()
+        }
+    }
+)
 
 @Composable
 private fun StarShape(filled: Boolean, color: Color, modifier: Modifier = Modifier) {
