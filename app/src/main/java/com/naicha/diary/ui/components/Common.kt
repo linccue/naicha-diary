@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -160,12 +159,13 @@ fun RatingStars(
                 contentAlignment = Alignment.Center
             ) {
                 // 底层：空心星星
-                Icon(
-                    imageVector = Icons.Default.StarBorder,
-                    contentDescription = null,
-                    tint = Color(0xFFE0E0E0), // 空星的颜色
-                    modifier = Modifier.fillMaxSize()
-                )
+               // 底层：灰色星星
+Icon(
+    imageVector = Icons.Filled.Star,
+    contentDescription = null,
+    tint = Color(0xFFE0E0E0), 
+    modifier = Modifier.fillMaxSize()
+)
                 
                 // 顶层：实心星星（根据评分显示全星、半星或隐藏）
                 if (isFull || isHalf) {
