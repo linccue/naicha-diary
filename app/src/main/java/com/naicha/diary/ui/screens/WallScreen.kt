@@ -2,8 +2,8 @@ package com.naicha.diary.ui.screens
 
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -185,10 +185,12 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 1. 贴纸墙
         item {
             DraggableStickerWall(items)
         }
 
+        // 2. 日历
         item {
             CalendarCard(
                 currentMonth = currentMonth,
@@ -203,6 +205,7 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
             )
         }
 
+        // 3. 当天记录
         item {
             val dateStr = SimpleDateFormat("d日 EEEE", Locale.CHINA).format(
                 Calendar.getInstance().apply {
@@ -241,25 +244,30 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
     }
 }
 
+// ================= 核心升级：缓慢降落、不规则不重叠、监听新增 =================
 class StickerNode(
     val tea: Drink,
-    initialOffset: Offset,
+    val initialX: Float,
+    val initialY: Float,
     val rotation: Float
 ) {
-    var offsetX by mutableStateOf(initialOffset.x)
-    var offsetY by mutableStateOf(initialOffset.y)
+    var offsetX by mutableStateOf(initialX)
+    var offsetY by mutableStateOf(initialY)
     var isDragging by mutableStateOf(false)
 }
 
 @Composable
-private fun DraggableStickerWall(items: List<Drink>) {
-    // 为了铺满两层，这里把展示数量增加到了 12 个
-    val displayItems = remember(items) { items.take(12) }
-    if (displayItems.isEmpty()) return
+private fun DraggableStickerWall(allItems: List<Drink>) {
+    // 只展示前 8 个，避免太拥挤
+    val targetItems = remember(allItems) { allItems.take(8) }
+    if (targetItems.isEmpty()) return
 
-    val cardSize = 64.dp // 为了铺满，卡片稍微改小一点点
+    val cardSize = 64.dp
     val wallHeight = 220.dp
     val density = LocalDensity.current
+
+    // 使用一个可变的列表来存储已经生成的贴纸节点，以便支持“只掉新增的”
+    val nodes = remember { mutableStateListOf<StickerNode>() }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -271,33 +279,58 @@ private fun DraggableStickerWall(items: List<Drink>) {
         val maxWidthPx = constraints.maxWidth.toFloat()
         val maxHeightPx = constraints.maxHeight.toFloat()
         val cardSizePx = with(density) { cardSize.toPx() }
-        val gapX = with(density) { 4.dp.toPx() } // 平铺间距
-        val gapY = with(density) { 4.dp.toPx() }
-        val paddingStart = with(density) { 16.dp.toPx() }
-        val paddingBottom = with(density) { 16.dp.toPx() }
 
-        // 掉落的起点：卡片顶端上方
-        val startY = -cardSizePx * 2 
+        // 计算网格（3列2行），用于分配不重叠的位置
+        val cols = 3
+        val rows = 2
+        val cellWidth = maxWidthPx / cols
+        val cellHeight = maxHeightPx / rows
 
-        // 计算一行能铺下几个
-        val columns = ((maxWidthPx - paddingStart * 2 + gapX) / (cardSizePx + gapX)).toInt().coerceAtLeast(1)
+        // 监听新增数据
+        LaunchedEffect(targetItems) {
+            val existingIds = nodes.map { it.tea.id }.toSet()
+            val newItems = targetItems.filter { it.id !in existingIds }
+            
+            // 如果之前是空的，或者是有新加的，就给它们分配位置
+            if (newItems.isNotEmpty()) {
+                // 如果节点太少，直接清空重建（比如首次加载）
+                if (nodes.isEmpty() || nodes.size + newItems.size > 6) {
+                    nodes.clear()
+                    val shuffledCells = (0 until (cols * rows)).shuffled()
+                    
+                    targetItems.forEachIndexed { index, tea ->
+                        val cellIndex = shuffledCells[index % (cols * rows)]
+                        val col = cellIndex % cols
+                        val row = cellIndex / cols
+                        
+                        // 格子中心 + 随机抖动，实现不规则感
+                        val jitterX = (Random.nextFloat() - 0.5f) * cellWidth * 0.4f
+                        val jitterY = (Random.nextFloat() - 0.5f) * cellHeight * 0.4f
+                        
+                        val x = (col * cellWidth + cellWidth / 2f - cardSizePx / 2f + jitterX).coerceIn(0f, maxWidthPx - cardSizePx)
+                        val y = (row * cellHeight + cellHeight / 2f - cardSizePx / 2f + jitterY).coerceIn(0f, maxHeightPx - cardSizePx)
 
-        val nodes = remember(displayItems, maxWidthPx, maxHeightPx) {
-            displayItems.mapIndexed { index, tea ->
-                // 计算当前贴纸应该在的行和列
-                val row = index / columns
-                val col = index % columns
-                
-                // X 轴：从左往右排
-                val targetX = paddingStart + col * (cardSizePx + gapX)
-                // Y 轴：从卡片底部往上排 (row=0是底部)
-                val targetY = maxHeightPx - paddingBottom - (row + 1) * cardSizePx - row * gapY
-                
-                StickerNode(
-                    tea = tea,
-                    initialOffset = Offset(targetX, targetY),
-                    rotation = Random.nextFloat() * 4f - 2f // 平铺时旋转角度小一点，显得整齐
-                )
+                        nodes.add(StickerNode(tea, x, y, Random.nextFloat() * 20f - 10f))
+                    }
+                } else {
+                    // 如果是新增，尝试找一个空位
+                    // (这里简化处理，因为最多8个，每次全量重排一次视觉上也是没问题的)
+                    nodes.clear()
+                    val shuffledCells = (0 until (cols * rows)).shuffled()
+                    targetItems.forEachIndexed { index, tea ->
+                        val cellIndex = shuffledCells[index % (cols * rows)]
+                        val col = cellIndex % cols
+                        val row = cellIndex / cols
+                        
+                        val jitterX = (Random.nextFloat() - 0.5f) * cellWidth * 0.4f
+                        val jitterY = (Random.nextFloat() - 0.5f) * cellHeight * 0.4f
+                        
+                        val x = (col * cellWidth + cellWidth / 2f - cardSizePx / 2f + jitterX).coerceIn(0f, maxWidthPx - cardSizePx)
+                        val y = (row * cellHeight + cellHeight / 2f - cardSizePx / 2f + jitterY).coerceIn(0f, maxHeightPx - cardSizePx)
+
+                        nodes.add(StickerNode(tea, x, y, Random.nextFloat() * 20f - 10f))
+                    }
+                }
             }
         }
 
@@ -307,8 +340,7 @@ private fun DraggableStickerWall(items: List<Drink>) {
                 index = index,
                 cardSize = cardSize,
                 maxX = maxWidthPx - cardSizePx,
-                maxY = maxHeightPx - cardSizePx,
-                startY = startY
+                maxY = maxHeightPx - cardSizePx
             )
         }
     }
@@ -320,20 +352,19 @@ private fun DraggableStickerItem(
     index: Int,
     cardSize: Dp,
     maxX: Float,
-    maxY: Float,
-    startY: Float
+    maxY: Float
 ) {
-    // 掉落动画，从 startY (卡片顶端外) 掉到 node.offsetY (计算好的目标位置)
-    val animY = remember { Animatable(startY) }
+    // 👇 核心改动：使用 Animatable 来做缓慢的垂直下落
+    val animY = remember { Animatable(-400f) }
     
     LaunchedEffect(Unit) {
-        // 按照 index 错开一点时间，让它们像瀑布一样依次掉落
-        kotlinx.coroutines.delay(index * 60L)
+        // 按照索引错开一点时间，依次缓慢降落
+        kotlinx.coroutines.delay(index * 120L)
         animY.animateTo(
             targetValue = node.offsetY,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
+            animationSpec = tween(
+                durationMillis = 1500, // 动画持续 1.5 秒，缓慢降落
+                easing = FastOutSlowInEasing // 缓动效果，起步快，落地慢
             )
         )
     }
@@ -345,7 +376,6 @@ private fun DraggableStickerItem(
         modifier = Modifier
             .zIndex(if (node.isDragging) 10f else 1f)
             .offset {
-                // 掉落时 X 轴固定在目标位置，直上直下；掉落后加上拖拽偏移
                 val curX = if (animY.isRunning) node.offsetX else (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
                 val curY = if (animY.isRunning) animY.value else (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
                 IntOffset(curX.roundToInt(), curY.roundToInt())
@@ -376,6 +406,7 @@ private fun DraggableStickerItem(
     }
 }
 
+// 日历相关
 @Composable
 private fun CalendarCard(
     currentMonth: Calendar,
