@@ -36,6 +36,8 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,6 +57,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -66,6 +69,7 @@ fun HomeScreen(
     onOpenDetail: (Drink) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     var showCategory by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -75,6 +79,25 @@ fun HomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var activeQuickFilter by remember { mutableStateOf<String?>(null) }
 
+    // 读取不喝打卡状态
+    val prefs = remember { context.getSharedPreferences("abstinence_prefs", android.content.Context.MODE_PRIVATE) }
+    val isTracking = prefs.getBoolean("is_tracking", false)
+    val targetDays = prefs.getInt("target_days", 7)
+    val startDate = prefs.getLong("start_date", 0L)
+    val drankDaysStr = prefs.getString("drank_days", "") ?: ""
+    val drankDays = remember(drankDaysStr) { if (drankDaysStr.isEmpty()) emptySet() else drankDaysStr.split(",").map { it.toInt() }.toSet() }
+    
+    val todayDiff = remember(startDate) {
+        if (startDate == 0L) 0 else {
+            val cal1 = Calendar.getInstance().apply { timeInMillis = startDate; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }
+            val cal2 = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }
+            ((cal2.timeInMillis - cal1.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
+        }
+    }
+    val validStreak = if (drankDays.contains(todayDiff)) 0 else todayDiff - drankDays.count { it < todayDiff }
+
+    // 数据统计
+    val totalCount = items.size
     val monthItems = remember(items) {
         val cal = Calendar.getInstance()
         val y = cal.get(Calendar.YEAR)
@@ -86,7 +109,14 @@ fun HomeScreen(
     }
     val monthCount = monthItems.size
     val monthSpend = monthItems.sumOf { it.price }
-    val dateLabel = remember { SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date()) }
+    
+    // 计算本周记录
+    val weekItemsCount = remember(items) {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
+        items.count { it.timestamp >= cal.timeInMillis }
+    }
 
     val processedItems = remember(items, selectedCategory, sortOrder, searchQuery, activeQuickFilter) {
         var result = items
@@ -114,11 +144,8 @@ fun HomeScreen(
             "本周" -> {
                 val cal = Calendar.getInstance()
                 cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0)
-                val weekStart = cal.timeInMillis
-                result = result.filter { it.timestamp >= weekStart }
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
+                result = result.filter { it.timestamp >= cal.timeInMillis }
             }
         }
 
@@ -142,42 +169,142 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 132.dp),
         ) {
+            // 1. 顶部打卡状态栏
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 22.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 22.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
-                        Text(text = "${TimeUtil.greeting()} 🧋", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground)
-                        Text(text = dateLabel, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(modifier = Modifier.weight(1f)) {
+                        val titleText = if (isTracking) {
+                            "不喝打卡第 ${todayDiff + 1}/$targetDays 天，\n继续保持>"
+                        } else {
+                            "今天喝点什么呢？\n去记一杯吧>"
+                        }
+                        Text(
+                            text = titleText,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Black,
+                            lineHeight = 32.sp,
+                            color = Color.Black
+                        )
+                    }
+                    // 右侧头像（需要你上传 girl_avatar.png）
+                    Image(
+                        painter = painterResource(id = R.drawable.girl_avatar),
+                        contentDescription = "头像",
+                        modifier = Modifier.size(64.dp).clip(CircleShape).border(1.dp, Color(0xFFE0E0E0), CircleShape)
+                    )
+                }
+            }
+
+            // 2. 三块数据统计卡片
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(160.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // 左侧大卡片：总记录数量
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Text("总记录数量", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(4.dp))
+                            Text("$totalCount", fontSize = 42.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                            
+                            Spacer(Modifier.weight(1f))
+                            
+                            // 底部胶囊标签
+                            Box(
+                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text("本周 +$weekItemsCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
+                        }
+                        // 背景透明杯子
+                        androidx.compose.foundation.Image(
+                            painter = painterResource(id = R.drawable.drink_milk_tea_cold),
+                            contentDescription = null,
+                            alpha = 0.05f,
+                            modifier = Modifier.size(100.dp).align(Alignment.CenterEnd).offset(x = 20.dp, y = 10.dp)
+                        )
+                    }
+
+                    // 右侧上下卡片
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // 本月已喝
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
+                            Column {
+                                Text("本月已喝", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
+                                Spacer(Modifier.weight(1f))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("$monthCount", fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                    Text(" 杯", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                    Spacer(Modifier.width(6.dp))
+                                    Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                        Text("+800%", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Spacer(Modifier.height(12.dp))
+                        
+                        // 本月花费
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
+                            Column {
+                                Text("本月花费", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
+                                Spacer(Modifier.weight(1f))
+                                Text("¥${formatMoney(monthSpend)}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                            }
+                        }
                     }
                 }
             }
 
+            // 3. 原有快捷按钮
             item {
-                HeroCard(
-                    monthCount = monthCount, monthSpend = monthSpend,
-                    todayStyle = monthItems.maxByOrNull { it.timestamp }?.categoryType ?: DrinkCategory.MilkTea,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
+                QuickActions(
+                    onRecord = onRecord,
+                    onAiRecord = onAiRecord,
+                    onOpenWall = onOpenWall,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
                 )
             }
 
-            item {
-                QuickActions(onRecord = onRecord, onAiRecord = onAiRecord, onOpenWall = onOpenWall, modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp))
-            }
-
+            // 4. 最近喝过标题与过滤
             item {
                 Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "最近喝过", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text(
+                            text = "最近喝过",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
                         Spacer(Modifier.weight(1f))
                         
-                        IconCircleButton(icon = { Icon(Icons.Default.Menu, "分类", tint = if (showCategory) Color.White else Color.Black) }, isActive = showCategory, onClick = { showCategory = !showCategory; if (showCategory) showSearch = false })
+                        IconCircleButton(
+                            icon = { Icon(Icons.Default.Menu, "分类", tint = if (showCategory) Color.White else Color.Black) },
+                            isActive = showCategory,
+                            onClick = { showCategory = !showCategory; if (showCategory) showSearch = false }
+                        )
                         Spacer(Modifier.width(8.dp))
                         
                         Box {
-                            IconCircleButton(icon = { Text("⇅", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (showSortMenu) Color.White else Color.Black) }, isActive = showSortMenu, onClick = { showSortMenu = true })
+                            IconCircleButton(
+                                icon = { Text("⇅", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (showSortMenu) Color.White else Color.Black) },
+                                isActive = showSortMenu,
+                                onClick = { showSortMenu = true }
+                            )
                             DropdownMenu(
                                 expanded = showSortMenu, onDismissRequest = { showSortMenu = false },
                                 containerColor = Color.Transparent, tonalElevation = 0.dp, shadowElevation = 0.dp, modifier = Modifier.background(Color.Transparent)
@@ -196,7 +323,11 @@ fun HomeScreen(
                         }
                         Spacer(Modifier.width(8.dp))
                         
-                        IconCircleButton(icon = { Icon(Icons.Default.Search, "搜索", tint = if (showSearch) Color.White else Color.Black) }, isActive = showSearch, onClick = { showSearch = !showSearch; if (!showSearch) { searchQuery = ""; activeQuickFilter = null }; if (showSearch) showCategory = false })
+                        IconCircleButton(
+                            icon = { Icon(Icons.Default.Search, "搜索", tint = if (showSearch) Color.White else Color.Black) },
+                            isActive = showSearch,
+                            onClick = { showSearch = !showSearch; if (!showSearch) { searchQuery = ""; activeQuickFilter = null }; if (showSearch) showCategory = false }
+                        )
                     }
                     
                     AnimatedVisibility(visible = showCategory) {
@@ -228,6 +359,7 @@ fun HomeScreen(
                 }
             }
 
+            // 5. 列表
             if (processedItems.isEmpty()) {
                 item { EmptyHint(onRecord = onRecord) }
             } else {
@@ -238,6 +370,8 @@ fun HomeScreen(
         }
     }
 }
+
+// ================= 其他保留的组件 =================
 
 @Composable
 private fun IconCircleButton(icon: @Composable () -> Unit, isActive: Boolean, onClick: () -> Unit) {
@@ -252,48 +386,14 @@ private fun FilterChipCustom(text: String, selected: Boolean, onClick: () -> Uni
 }
 
 @Composable
-private fun HeroCard(monthCount: Int, monthSpend: Double, todayStyle: DrinkCategory, modifier: Modifier = Modifier) {
-    val liquid = when { monthCount == 0 -> Color(0xFFD9C3AE); monthCount == 1 -> Caramel; monthCount == 2 -> Taro; else -> Strawberry }
-    Box(modifier = modifier.fillMaxWidth().shadow(18.dp, MaterialTheme.shapes.extraLarge, ambientColor = Caramel.copy(alpha = 0.55f), spotColor = Caramel.copy(alpha = 0.55f)).clip(MaterialTheme.shapes.extraLarge).background(Brush.linearGradient(colors = listOf(Color(0xFFEFBE93), Color(0xFFD89B69), Color(0xFFC0824F)), start = Offset.Zero, end = Offset.Infinite))) {
-        Box(modifier = Modifier.size(190.dp).align(Alignment.TopEnd).background(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.28f), Color.Transparent)), CircleShape))
-        Row(modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 6.dp, top = 20.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "本月已喝", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.92f))
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    AnimatedNumber(value = monthCount, style = MaterialTheme.typography.displaySmall.copy(fontSize = 62.sp), color = Color.White)
-                    Spacer(Modifier.width(6.dp))
-                    Text(text = "杯", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.85f), modifier = Modifier.padding(bottom = 12.dp))
-                }
-                Spacer(Modifier.height(12.dp))
-                Row {
-                    MiniStat(label = "本月花费", value = "¥${formatMoney(monthSpend)}", modifier = Modifier.weight(1f))
-                    Spacer(Modifier.width(8.dp))
-                    MiniStat(label = "平均花费", value = "¥${formatMoney(if (monthCount > 0) monthSpend / monthCount else 0.0)}", modifier = Modifier.weight(1f))
-                }
-            }
-            DrinkCup(modifier = Modifier.width(104.dp).height(132.dp), liquidColor = liquid, strawColor = if (monthCount == 0) Color(0xFFB9A896) else Strawberry, toppingCount = (3 + monthCount * 2).coerceAtMost(10), style = cupStyleFor(todayStyle))
-        }
-    }
-}
-
-@Composable
-private fun MiniStat(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.20f)).padding(horizontal = 10.dp, vertical = 7.dp)) {
-        Text(text = label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.78f))
-        Text(text = value, style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
 private fun QuickActions(onRecord: () -> Unit, onAiRecord: () -> Unit, onOpenWall: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxWidth()) {
         AiBanner(onClick = onAiRecord)
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
-            ActionTile(title = "手动记", subtitle = "自己填更准", emoji = "✍️", colors = listOf(Caramel, Color(0xFFE2A776)), onClick = onRecord, modifier = Modifier.weight(1f))
+            ActionTile(title = "手动记", subtitle = "自己填更准", emoji = "✍️", colors = listOf(Color(0xFFD39B6A), Color(0xFFE8C09E)), onClick = onRecord, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
-            ActionTile(title = "饮品墙", subtitle = "看看攒了多少", emoji = "🧱", colors = listOf(Taro, Color(0xFFCBBAF5)), onClick = onOpenWall, modifier = Modifier.weight(1f))
+            ActionTile(title = "饮品墙", subtitle = "看看攒了多少", emoji = "🧱", colors = listOf(Color(0xFFB6A3F9), Color(0xFFD4C9FB)), onClick = onOpenWall, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -303,16 +403,16 @@ private fun AiBanner(onClick: () -> Unit) {
     val transition = rememberInfiniteTransition(label = "ai")
     val shift by transition.animateFloat(initialValue = -1f, targetValue = 2f, animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Restart), label = "aiShift")
     BouncyBox(onClick = onClick) {
-        Box(modifier = Modifier.fillMaxWidth().shadow(14.dp, MaterialTheme.shapes.large, ambientColor = Taro.copy(alpha = 0.55f), spotColor = Taro.copy(alpha = 0.55f)).clip(MaterialTheme.shapes.large).background(Brush.linearGradient(listOf(Color(0xFF6C5CE7), Color(0xFF8E7CF0), Color(0xFFB79CED))))) {
+        Box(modifier = Modifier.fillMaxWidth().shadow(14.dp, RoundedCornerShape(24.dp), ambientColor = Color(0xFF6C5CE7).copy(alpha = 0.4f), spotColor = Color(0xFF6C5CE7).copy(alpha = 0.4f)).clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(listOf(Color(0xFF7B6BF0), Color(0xFFA594F9))))) {
             Box(modifier = Modifier.matchParentSize().background(Brush.linearGradient(colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.22f), Color.Transparent), start = Offset(shift * 600f - 300f, 0f), end = Offset(shift * 600f, 400f))))
-            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) { Text(text = "🤖", fontSize = 23.sp) }
+            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) { Text(text = "🤖", fontSize = 24.sp) }
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "AI 识图 · 拍一下就好", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
                     Text(text = "小票 / 杯身 / 订单截图，自动填好", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.86f))
                 }
-                Text(text = "→", fontSize = 20.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(text = "→", fontSize = 22.sp, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -321,10 +421,10 @@ private fun AiBanner(onClick: () -> Unit) {
 @Composable
 private fun ActionTile(title: String, subtitle: String, emoji: String, colors: List<Color>, onClick: () -> Unit, modifier: Modifier = Modifier) {
     BouncyBox(onClick = onClick, modifier = modifier) {
-        Box(modifier = Modifier.fillMaxWidth().shadow(12.dp, MaterialTheme.shapes.large, ambientColor = colors.first().copy(alpha = 0.45f), spotColor = colors.first().copy(alpha = 0.45f)).clip(MaterialTheme.shapes.large).background(Brush.linearGradient(colors)).padding(horizontal = 16.dp, vertical = 16.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().shadow(12.dp, RoundedCornerShape(24.dp), ambientColor = colors.first().copy(alpha = 0.4f), spotColor = colors.first().copy(alpha = 0.4f)).clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(colors)).padding(horizontal = 16.dp, vertical = 20.dp)) {
             Column {
-                Text(text = emoji, fontSize = 22.sp)
-                Spacer(Modifier.height(8.dp))
+                Text(text = emoji, fontSize = 24.sp)
+                Spacer(Modifier.height(12.dp))
                 Text(text = title, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
                 Text(text = subtitle, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f))
             }
@@ -347,72 +447,21 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                             val raw = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
                             if (raw != null) trimTransparentEdges(raw) else null 
                         }
-                        
                         if (bitmap != null) {
                             val imageBitmap = bitmap.asImageBitmap()
-                            
-                            // 👇 用 Canvas 保证均匀白边
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 val imgWidth = imageBitmap.width.toFloat()
                                 val imgHeight = imageBitmap.height.toFloat()
-                                
                                 val canvasRatio = size.width / size.height
                                 val imgRatio = imgWidth / imgHeight
-                                
-                                val drawWidth: Float
-                                val drawHeight: Float
-                                if (canvasRatio > imgRatio) {
-                                    drawHeight = size.height
-                                    drawWidth = drawHeight * imgRatio
-                                } else {
-                                    drawWidth = size.width
-                                    drawHeight = drawWidth / imgRatio
-                                }
-                                
-                                val dx = (size.width - drawWidth) / 2f
-                                val dy = (size.height - drawHeight) / 2f
-                                
-                                val dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt())
-                                val dstOffset = IntOffset(dx.toInt(), dy.toInt())
-                                
-                                // 白边厚度 2dp
+                                val drawWidth: Float; val drawHeight: Float
+                                if (canvasRatio > imgRatio) { drawHeight = size.height; drawWidth = drawHeight * imgRatio } else { drawWidth = size.width; drawHeight = drawWidth / imgRatio }
+                                val dx = (size.width - drawWidth) / 2f; val dy = (size.height - drawHeight) / 2f
+                                val dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt()); val dstOffset = IntOffset(dx.toInt(), dy.toInt())
                                 val strokePx = 2.dp.toPx().toInt()
-                                
-                                // 八个方向的偏移
-                                val offsets = listOf(
-                                    IntOffset(-strokePx, -strokePx),
-                                    IntOffset(0, -strokePx),
-                                    IntOffset(strokePx, -strokePx),
-                                    IntOffset(-strokePx, 0),
-                                    IntOffset(strokePx, 0),
-                                    IntOffset(-strokePx, strokePx),
-                                    IntOffset(0, strokePx),
-                                    IntOffset(strokePx, strokePx)
-                                )
-                                
-                                // 画 8 个方向的纯白底影
-                                offsets.forEach { offset ->
-                                    drawImage(
-                                        image = imageBitmap,
-                                        srcOffset = IntOffset.Zero,
-                                        srcSize = IntSize(imageBitmap.width, imageBitmap.height),
-                                        dstOffset = IntOffset(dstOffset.x + offset.x, dstOffset.y + offset.y),
-                                        dstSize = dstSize,
-                                        colorFilter = ColorFilter.tint(Color.White),
-                                        filterQuality = FilterQuality.High
-                                    )
-                                }
-                                
-                                // 叠原图
-                                drawImage(
-                                    image = imageBitmap,
-                                    srcOffset = IntOffset.Zero,
-                                    srcSize = IntSize(imageBitmap.width, imageBitmap.height),
-                                    dstOffset = dstOffset,
-                                    dstSize = dstSize,
-                                    colorFilter = null,
-                                    filterQuality = FilterQuality.High
-                                )
+                                val offsets = listOf(IntOffset(-strokePx, -strokePx), IntOffset(0, -strokePx), IntOffset(strokePx, -strokePx), IntOffset(-strokePx, 0), IntOffset(strokePx, 0), IntOffset(-strokePx, strokePx), IntOffset(0, strokePx), IntOffset(strokePx, strokePx))
+                                offsets.forEach { offset -> drawImage(image = imageBitmap, srcOffset = IntOffset.Zero, srcSize = IntSize(imageBitmap.width, imageBitmap.height), dstOffset = IntOffset(dstOffset.x + offset.x, dstOffset.y + offset.y), dstSize = dstSize, colorFilter = ColorFilter.tint(Color.White), filterQuality = FilterQuality.High) }
+                                drawImage(image = imageBitmap, srcOffset = IntOffset.Zero, srcSize = IntSize(imageBitmap.width, imageBitmap.height), dstOffset = dstOffset, dstSize = dstSize, colorFilter = null, filterQuality = FilterQuality.High)
                             }
                         } else {
                             LocalPhoto(file = file, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
@@ -420,14 +469,11 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     } else {
                         Image(painter = painterResource(id = getDrinkIconRes(tea)), contentDescription = null, modifier = Modifier.fillMaxSize().padding(6.dp), contentScale = ContentScale.Fit)
                     }
-                    
                     Box(modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp).background(Color.White, CircleShape).padding(2.dp)) {
                         BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
                     }
                 }
-
                 Spacer(Modifier.width(16.dp))
-
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(text = displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -436,18 +482,14 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                             Text(text = TimeUtil.dayLabel(tea.timestamp), style = MaterialTheme.typography.labelSmall, color = PearlSoft)
                         }
                     }
-                    
                     Spacer(Modifier.height(2.dp))
                     Text(text = tea.brand.ifBlank { "未知品牌" }, style = MaterialTheme.typography.bodyMedium, color = PearlSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    
                     Spacer(Modifier.height(6.dp))
                     RatingStars(rating = tea.rating, starSize = 14.dp)
-                    
                     val tags = mutableListOf<String>()
                     if (tea.sugar.isNotBlank()) tags.add(tea.sugar)
                     if (tea.ice.isNotBlank()) tags.add(tea.ice)
                     if (tea.toppings.isNotEmpty()) tags.addAll(tea.toppings)
-
                     if (tags.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
