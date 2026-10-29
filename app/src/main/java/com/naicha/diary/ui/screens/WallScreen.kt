@@ -3,6 +3,8 @@ package com.naicha.diary.ui.screens
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -27,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -55,6 +58,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -64,17 +68,12 @@ private enum class WallMode(val label: String, val emoji: String) {
     Timeline("时间轴", "🕰"),
 }
 
-// ================= 内存缓存，解决滑动卡顿 =================
 object StickerImageCache {
     private val cache = mutableMapOf<String, ImageBitmap?>()
-    
     fun getImage(tea: Drink): ImageBitmap? {
         val key = tea.photoPath ?: "preset_${getDrinkIconRes(tea)}"
         if (cache.containsKey(key)) return cache[key]
-
-        val bitmap = if (tea.photoPath == null) {
-            null 
-        } else {
+        val bitmap = if (tea.photoPath == null) null else {
             val file = PhotoStore.fileOf(tea.photoPath)
             val raw = BitmapFactory.decodeFile(file.absolutePath)
             if (raw != null) trimTransparentEdges(raw).asImageBitmap() else null
@@ -86,8 +85,8 @@ object StickerImageCache {
 
 class StickerNode(
     val tea: Drink,
-    val initialX: Float,
-    val initialY: Float,
+    initialX: Float,
+    initialY: Float,
     val rotation: Float
 ) {
     var offsetX by mutableStateOf(initialX)
@@ -107,40 +106,15 @@ fun WallScreen(
 
     val sorted = remember(items) { items.sortedByDescending { it.timestamp } }
     val totalSpend = remember(items) { items.sumOf { it.price } }
-    val topBrand = remember(items) {
-        items.groupingBy { it.brand }.eachCount().maxByOrNull { it.value }?.key
-    }
+    val topBrand = remember(items) { items.groupingBy { it.brand }.eachCount().maxByOrNull { it.value }?.key }
     val photoCount = remember(items) { items.count { it.photoPath != null } }
 
-    val displayItems = remember(sorted) { sorted.take(8) }
-    val density = LocalDensity.current
-    val cardSize = 64.dp
-    val cardSizePx = with(density) { cardSize.toPx() }
+    val stickerNodes = remember { mutableStateListOf<StickerNode>() }
 
-    val nodes = remember(displayItems) {
-        val list = mutableListOf<StickerNode>()
-        val cols = 3
-        val rows = 2
-        val cellWidth = 350f / cols
-        val cellHeight = 220f / rows
-        
-        val shuffledCells = (0 until (cols * rows)).shuffled()
-        
-        displayItems.forEachIndexed { index, tea ->
-            val cellIndex = shuffledCells[index % (cols * rows)]
-            val col = cellIndex % cols
-            val row = cellIndex / cols
-            
-            val random = Random(tea.id.hashCode())
-            val jitterX = (random.nextFloat() - 0.5f) * cellWidth * 0.4f
-            val jitterY = (random.nextFloat() - 0.5f) * cellHeight * 0.4f
-            
-            val x = col * cellWidth + cellWidth / 2f - cardSizePx / 2f + jitterX
-            val y = row * cellHeight + cellHeight / 2f - cardSizePx / 2f + jitterY
-
-            list.add(StickerNode(tea, x, y, random.nextFloat() * 20f - 10f))
-        }
-        list
+    LaunchedEffect(sorted) {
+        val currentItems = sorted.take(8)
+        val currentIds = currentItems.map { it.id }.toSet()
+        stickerNodes.removeAll { it.tea.id !in currentIds }
     }
 
     Box(modifier.fillMaxSize()) {
@@ -152,83 +126,42 @@ fun WallScreen(
 
         Column(modifier = Modifier.fillMaxSize()) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 22.dp, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 22.dp, vertical = 12.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "我的饮品墙 🧱",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                        Text(
-                            text = if (items.isEmpty()) "还没有故事" else
-                                "共 ${items.size} 杯 · ¥${formatMoney(totalSpend)}" +
-                                    (topBrand?.let { " · 最爱 $it" } ?: ""),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Text(text = "我的饮品墙 🧱", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground)
+                        Text(text = if (items.isEmpty()) "还没有故事" else "共 ${items.size} 杯 · ¥${formatMoney(totalSpend)}" + (topBrand?.let { " · 最爱 $it" } ?: ""), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     BouncyBox(onClick = { if (items.isNotEmpty()) showPoster = true }) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .shadow(8.dp, CircleShape, ambientColor = Caramel.copy(alpha = 0.5f), spotColor = Caramel.copy(alpha = 0.5f))
-                                .clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(Caramel, Color(0xFFE2A776)))),
-                            contentAlignment = Alignment.Center,
-                        ) {
+                        Box(modifier = Modifier.size(44.dp).shadow(8.dp, CircleShape, ambientColor = Caramel.copy(alpha = 0.5f), spotColor = Caramel.copy(alpha = 0.5f)).clip(CircleShape).background(Brush.linearGradient(listOf(Caramel, Color(0xFFE2A776)))), contentAlignment = Alignment.Center) {
                             Icon(Icons.Filled.Share, "生成分享图", tint = Color.White, modifier = Modifier.size(19.dp))
                         }
                     }
                 }
-
                 Spacer(Modifier.height(14.dp))
-
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     WallMode.entries.forEach { entry ->
-                        TagChip(
-                            text = "${entry.emoji} ${entry.label}",
-                            selected = mode == entry,
-                            accent = Caramel,
-                            onClick = { mode = entry },
-                        )
+                        TagChip(text = "${entry.emoji} ${entry.label}", selected = mode == entry, accent = Caramel, onClick = { mode = entry })
                     }
                 }
             }
 
             when (mode) {
-                WallMode.Wall -> WallTabContent(
-                    items = sorted, 
-                    nodes = nodes,
-                    onOpenDetail = onOpenDetail
-                )
+                WallMode.Wall -> WallTabContent(items = sorted, nodes = stickerNodes, onOpenDetail = onOpenDetail)
                 WallMode.Brand -> BrandRank(items = sorted)
                 WallMode.Timeline -> TimelineView(items = sorted, onOpenDetail = onOpenDetail)
             }
         }
 
         if (showPoster) {
-            SharePosterDialog(
-                items = sorted,
-                totalSpend = totalSpend,
-                topBrand = topBrand,
-                photoCount = photoCount,
-                onDismiss = { showPoster = false },
-            )
+            SharePosterDialog(items = sorted, totalSpend = totalSpend, topBrand = topBrand, photoCount = photoCount, onDismiss = { showPoster = false })
         }
     }
 }
 
 @Composable
-private fun WallTabContent(
-    items: List<Drink>, 
-    nodes: List<StickerNode>,
-    onOpenDetail: (Drink) -> Unit
-) {
+private fun WallTabContent(items: List<Drink>, nodes: SnapshotStateList<StickerNode>, onOpenDetail: (Drink) -> Unit) {
     var currentMonth by remember { mutableStateOf(Calendar.getInstance()) }
     var selectedDay by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.DAY_OF_MONTH)) }
 
@@ -243,9 +176,7 @@ private fun WallTabContent(
     }
     
     val dayRecords = remember(monthItems) {
-        monthItems.groupBy {
-            Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.DAY_OF_MONTH)
-        }
+        monthItems.groupBy { Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.DAY_OF_MONTH) }
     }
 
     val selectedDayRecords = dayRecords[selectedDay] ?: emptyList()
@@ -255,17 +186,12 @@ private fun WallTabContent(
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            DraggableStickerWall(nodes)
-        }
+        item { DraggableStickerWall(items, nodes) }
 
         item {
             CalendarCard(
                 currentMonth = currentMonth,
-                onMonthChange = { 
-                    currentMonth = it 
-                    selectedDay = 1 
-                },
+                onMonthChange = { currentMonth = it; selectedDay = 1 },
                 monthItems = monthItems,
                 dayRecords = dayRecords,
                 selectedDay = selectedDay,
@@ -275,66 +201,108 @@ private fun WallTabContent(
 
         item {
             val dateStr = SimpleDateFormat("d日 EEEE", Locale.CHINA).format(
-                Calendar.getInstance().apply {
-                    set(Calendar.YEAR, year)
-                    set(Calendar.MONTH, month)
-                    set(Calendar.DAY_OF_MONTH, selectedDay)
-                }.time
+                Calendar.getInstance().apply { set(Calendar.YEAR, year); set(Calendar.MONTH, month); set(Calendar.DAY_OF_MONTH, selectedDay) }.time
             )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(text = dateStr, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                Text(
-                    text = "${selectedDayRecords.size} 杯", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PearlSoft,
-                    modifier = Modifier.background(Color(0xFFF4F5F0), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp)
-                )
+                Text(text = "${selectedDayRecords.size} 杯", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PearlSoft, modifier = Modifier.background(Color(0xFFF4F5F0), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
             }
         }
 
         if (selectedDayRecords.isEmpty()) {
             item {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFFF4F5F0)),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFFF4F5F0)), contentAlignment = Alignment.Center) {
                     Text(text = "当天暂无记录", style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
                 }
             }
         } else {
-            items(selectedDayRecords, key = { it.id }) { tea ->
-                WallStickerRow(tea = tea, onClick = { onOpenDetail(tea) })
-            }
+            items(selectedDayRecords, key = { it.id }) { tea -> WallStickerRow(tea = tea, onClick = { onOpenDetail(tea) }) }
         }
     }
 }
 
+// ================= 核心碰撞检测与网格平铺 =================
 @Composable
-private fun DraggableStickerWall(nodes: List<StickerNode>) {
-    if (nodes.isEmpty()) return
+private fun DraggableStickerWall(allItems: List<Drink>, nodes: SnapshotStateList<StickerNode>) {
+    val targetItems = remember(allItems) { allItems.take(8) }
+    if (targetItems.isEmpty()) return
 
     val cardSize = 64.dp
-    val wallHeight = 220.dp
+    val wallHeight = 240.dp // 稍微增加高度，留出碰撞空间
     val density = LocalDensity.current
 
     BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(wallHeight)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFFE6E8E0))
+        modifier = Modifier.fillMaxWidth().height(wallHeight).clip(RoundedCornerShape(24.dp)).background(Color(0xFFE6E8E0))
     ) {
         val maxWidthPx = constraints.maxWidth.toFloat()
         val maxHeightPx = constraints.maxHeight.toFloat()
         val cardSizePx = with(density) { cardSize.toPx() }
 
+        LaunchedEffect(targetItems, maxWidthPx, maxHeightPx) {
+            if (maxWidthPx <= 0f || maxHeightPx <= 0f) return@LaunchedEffect
+            val currentIds = nodes.map { it.tea.id }.toSet()
+            val newItems = targetItems.filter { it.id !in currentIds }
+
+            if (newItems.isNotEmpty()) {
+                val cols = 4 // 4列3行，足够放下8个且不拥挤
+                val rows = 3
+                val padding = with(density) { 8.dp.toPx() }
+                val availableW = maxWidthPx - 2 * padding - cardSizePx
+                val availableH = maxHeightPx - 2 * padding - cardSizePx
+                val cellW = availableW / (cols - 1)
+                val cellH = availableH / (rows - 1)
+
+                // 记录已被占用的格子
+                val occupiedCells = nodes.map { 
+                    val cx = ((it.offsetX - padding) / cellW).roundToInt().coerceIn(0, cols - 1)
+                    val cy = ((it.offsetY - padding) / cellH).roundToInt().coerceIn(0, rows - 1)
+                    cx to cy
+                }.toMutableSet()
+
+                newItems.forEach { tea ->
+                    val random = Random(tea.id.hashCode() + System.currentTimeMillis().toInt()) 
+                    
+                    var col = 0
+                    var row = 0
+                    var found = false
+                    // 寻找一个没被占用的格子
+                    for (r in 0 until rows) {
+                        for (c in 0 until cols) {
+                            if (!occupiedCells.contains(c to r)) {
+                                col = c
+                                row = r
+                                found = true
+                                break
+                            }
+                        }
+                        if (found) break
+                    }
+                    if (!found) {
+                        col = random.nextInt(cols)
+                        row = random.nextInt(rows)
+                    } else {
+                        occupiedCells.add(col to row)
+                    }
+
+                    // 小幅度抖动
+                    val jitterX = (random.nextFloat() - 0.5f) * cellW * 0.3f
+                    val jitterY = (random.nextFloat() - 0.5f) * cellH * 0.3f
+
+                    val x = padding + col * cellW + jitterX
+                    val y = padding + row * cellH + jitterY
+
+                    nodes.add(StickerNode(tea, x.coerceIn(0f, maxWidthPx - cardSizePx), y.coerceIn(0f, maxHeightPx - cardSizePx), random.nextFloat() * 16f - 8f))
+                }
+            }
+        }
+
         nodes.forEachIndexed { index, node ->
             DraggableStickerItem(
                 node = node,
                 index = index,
+                allNodes = nodes,
                 cardSize = cardSize,
+                cardSizePx = cardSizePx,
                 maxX = maxWidthPx - cardSizePx,
                 maxY = maxHeightPx - cardSizePx
             )
@@ -346,22 +314,29 @@ private fun DraggableStickerWall(nodes: List<StickerNode>) {
 private fun DraggableStickerItem(
     node: StickerNode,
     index: Int,
+    allNodes: List<StickerNode>,
     cardSize: Dp,
+    cardSizePx: Float,
     maxX: Float,
     maxY: Float
 ) {
-    val animY = remember { Animatable(if (node.hasAnimated) node.offsetY else -400f) }
-    
+    // 使用 Animatable 控制视觉位置，解决瞬移
+    val animX = remember { Animatable(if (node.hasAnimated) node.offsetX else -300f) }
+    val animY = remember { Animatable(if (node.hasAnimated) node.offsetY else -300f) }
+
+    // 监听位置变化：如果是松手弹开导致的位置变化，应用弹簧动画
+    LaunchedEffect(node.offsetX, node.offsetY) {
+        if (node.hasAnimated && !node.isDragging) {
+            launch { animX.animateTo(node.offsetX, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+            launch { animY.animateTo(node.offsetY, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+        }
+    }
+
+    // 初始掉落动画
     LaunchedEffect(Unit) {
         if (!node.hasAnimated) {
-            kotlinx.coroutines.delay(index * 100L)
-            animY.animateTo(
-                targetValue = node.offsetY,
-                animationSpec = tween(
-                    durationMillis = 1500,
-                    easing = FastOutSlowInEasing
-                )
-            )
+            kotlinx.coroutines.delay(index * 120L)
+            launch { animY.animateTo(node.offsetY, tween(1200, easing = FastOutSlowInEasing)) }
             node.hasAnimated = true
         }
     }
@@ -373,8 +348,8 @@ private fun DraggableStickerItem(
         modifier = Modifier
             .zIndex(if (node.isDragging) 10f else 1f)
             .offset {
-                val curX = if (animY.isRunning) node.offsetX else (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
-                val curY = if (animY.isRunning) animY.value else (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
+                val curX = if (node.isDragging) (node.offsetX + dragOffsetX).coerceIn(0f, maxX) else animX.value
+                val curY = if (node.isDragging) (node.offsetY + dragOffsetY).coerceIn(0f, maxY) else animY.value
                 IntOffset(curX.roundToInt(), curY.roundToInt())
             }
             .size(cardSize)
@@ -384,17 +359,43 @@ private fun DraggableStickerItem(
                     onDragStart = { node.isDragging = true },
                     onDragEnd = { 
                         node.isDragging = false
-                        node.offsetX = (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
-                        node.offsetY = (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
+                        // 👇 松手时计算新位置并进行碰撞避让
+                        var targetX = (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
+                        var targetY = (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
+                        
+                        var iterations = 0
+                        while (iterations < 5) {
+                            var collided = false
+                            for (other in allNodes) {
+                                if (other.tea.id == node.tea.id) continue
+                                // 如果小于卡片尺寸，说明重叠了（留一点点余量）
+                                if (abs(targetX - other.offsetX) < cardSizePx * 0.8f && abs(targetY - other.offsetY) < cardSizePx * 0.8f) {
+                                    collided = true
+                                    // 沿 X 或 Y 轴推开
+                                    val dx = targetX - other.offsetX
+                                    val dy = targetY - other.offsetY
+                                    if (abs(dx) > abs(dy)) {
+                                        targetX += if (dx > 0) cardSizePx * 0.9f else -cardSizePx * 0.9f
+                                    } else {
+                                        targetY += if (dy > 0) cardSizePx * 0.9f else -cardSizePx * 0.9f
+                                    }
+                                    targetX = targetX.coerceIn(0f, maxX)
+                                    targetY = targetY.coerceIn(0f, maxY)
+                                }
+                            }
+                            if (!collided) break
+                            iterations++
+                        }
+
+                        node.offsetX = targetX
+                        node.offsetY = targetY
                         dragOffsetX = 0f
                         dragOffsetY = 0f
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        val newDragX = dragOffsetX + dragAmount.x
-                        val newDragY = dragOffsetY + dragAmount.y
-                        dragOffsetX = newDragX.coerceIn(-node.offsetX, maxX - node.offsetX)
-                        dragOffsetY = newDragY.coerceIn(-node.offsetY, maxY - node.offsetY)
+                        dragOffsetX = (dragOffsetX + dragAmount.x).coerceIn(-node.offsetX, maxX - node.offsetX)
+                        dragOffsetY = (dragOffsetY + dragAmount.y).coerceIn(-node.offsetY, maxY - node.offsetY)
                     }
                 )
             }
@@ -402,6 +403,8 @@ private fun DraggableStickerItem(
         StickerImage(tea = node.tea, modifier = Modifier.fillMaxSize())
     }
 }
+
+// ================= 以下为保留的日历、列表等代码 =================
 
 @Composable
 private fun CalendarCard(
@@ -425,9 +428,7 @@ private fun CalendarCard(
 
     val today = Calendar.getInstance()
 
-    Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(20.dp)
-    ) {
+    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(20.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(text = "${year}年${month + 1}月", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Row {
@@ -443,11 +444,7 @@ private fun CalendarCard(
 
         Spacer(Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF8F9FA)).padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF8F9FA)).padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             StatCol("该月消费", "¥${formatMoney(totalSpend)}")
             Box(modifier = Modifier.width(1.dp).height(30.dp).background(Color(0xFFE0E0E0)))
             StatCol("该月杯数", "${totalCups} 杯")
@@ -476,29 +473,12 @@ private fun CalendarCard(
                             val isSelected = day == selectedDay
                             val isToday = day == today.get(Calendar.DAY_OF_MONTH) && month == today.get(Calendar.MONTH)
 
-                            Box(
-                                modifier = Modifier.fillMaxSize()
-                                    .clip(CircleShape)
-                                    .background(if (isSelected) Color(0xFFF0F0F0) else Color.Transparent)
-                                    .clickable { onSelectDay(day) },
-                                contentAlignment = Alignment.Center
-                            ) {
+                            Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(if (isSelected) Color(0xFFF0F0F0) else Color.Transparent).clickable { onSelectDay(day) }, contentAlignment = Alignment.Center) {
                                 if (!drinks.isNullOrEmpty()) {
                                     val brand = Catalog.brandOf(drinks.first().brand)
-                                    BrandBadge(
-                                        badge = brand.badge,
-                                        color = Color(brand.color),
-                                        size = 32.dp,
-                                        logo = brand.logo,
-                                        squircle = Catalog.isSquircle(brand.name)
-                                    )
+                                    BrandBadge(badge = brand.badge, color = Color(brand.color), size = 32.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
                                 } else {
-                                    Text(
-                                        text = day.toString(),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = if (isToday) Caramel else MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
+                                    Text(text = day.toString(), style = MaterialTheme.typography.titleMedium, color = if (isToday) Caramel else MaterialTheme.colorScheme.onSurface, fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal)
                                 }
                             }
                         }
@@ -510,13 +490,9 @@ private fun CalendarCard(
         Spacer(Modifier.height(16.dp))
         
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Box(
-                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).border(1.dp, Color(0xFFF0F0F0), RoundedCornerShape(50)).clickable {
-                    val c = Calendar.getInstance()
-                    onMonthChange(c)
-                    onSelectDay(c.get(Calendar.DAY_OF_MONTH))
-                }.padding(horizontal = 20.dp, vertical = 8.dp)
-            ) {
+            Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).border(1.dp, Color(0xFFF0F0F0), RoundedCornerShape(50)).clickable {
+                val c = Calendar.getInstance(); onMonthChange(c); onSelectDay(c.get(Calendar.DAY_OF_MONTH))
+            }.padding(horizontal = 20.dp, vertical = 8.dp)) {
                 Text("回到今天", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
             }
         }
@@ -538,19 +514,14 @@ private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
     val displayName = tea.name.ifBlank { if (tea.category == "咖啡") "神秘咖啡" else "神秘${tea.category}" }
 
     BouncyBox(onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
                 StickerImage(tea = tea, modifier = Modifier.fillMaxSize())
                 Box(modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp).background(Color.White, CircleShape).padding(2.dp)) {
                     BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
                 }
             }
-
             Spacer(Modifier.width(16.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(text = displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -559,12 +530,10 @@ private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
                 Text(text = tea.brand.ifBlank { "未知品牌" }, style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
                 Spacer(Modifier.height(6.dp))
                 RatingStars(rating = tea.rating, starSize = 14.dp)
-                
                 val tags = mutableListOf<String>()
                 if (tea.sugar.isNotBlank()) tags.add(tea.sugar)
                 if (tea.ice.isNotBlank()) tags.add(tea.ice)
                 if (tea.toppings.isNotEmpty()) tags.addAll(tea.toppings)
-
                 if (tags.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -582,11 +551,8 @@ private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
 
 @Composable
 fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
-    // 👇 修复：将 ImageBitmap.imageResource 移出 remember 块，避免 Composable 上下文报错
     val defaultBitmap = if (tea.photoPath == null) ImageBitmap.imageResource(id = getDrinkIconRes(tea)) else null
-    val customBitmap = remember(tea) {
-        if (tea.photoPath != null) StickerImageCache.getImage(tea) else null
-    }
+    val customBitmap = remember(tea) { if (tea.photoPath != null) StickerImageCache.getImage(tea) else null }
     val imageBitmap = customBitmap ?: defaultBitmap
 
     if (imageBitmap == null) return
@@ -596,67 +562,25 @@ fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
         val imgHeight = imageBitmap.height.toFloat()
         val canvasRatio = size.width / size.height
         val imgRatio = imgWidth / imgHeight
-        
-        val drawWidth: Float
-        val drawHeight: Float
-        if (canvasRatio > imgRatio) {
-            drawHeight = size.height
-            drawWidth = drawHeight * imgRatio
-        } else {
-            drawWidth = size.width
-            drawHeight = drawWidth / imgRatio
-        }
-        
-        val dx = (size.width - drawWidth) / 2f
-        val dy = (size.height - drawHeight) / 2f
-        val dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt())
-        val dstOffset = IntOffset(dx.toInt(), dy.toInt())
-        
+        val drawWidth: Float; val drawHeight: Float
+        if (canvasRatio > imgRatio) { drawHeight = size.height; drawWidth = drawHeight * imgRatio } else { drawWidth = size.width; drawHeight = drawWidth / imgRatio }
+        val dx = (size.width - drawWidth) / 2f; val dy = (size.height - drawHeight) / 2f
+        val dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt()); val dstOffset = IntOffset(dx.toInt(), dy.toInt())
         val strokePx = 2.dp.toPx().toInt()
-        val offsets = listOf(
-            IntOffset(-strokePx, -strokePx), IntOffset(0, -strokePx), IntOffset(strokePx, -strokePx),
-            IntOffset(-strokePx, 0), IntOffset(strokePx, 0),
-            IntOffset(-strokePx, strokePx), IntOffset(0, strokePx), IntOffset(strokePx, strokePx)
-        )
-        
-        offsets.forEach { offset ->
-            drawImage(
-                image = imageBitmap,
-                srcOffset = IntOffset.Zero,
-                srcSize = IntSize(imageBitmap.width, imageBitmap.height),
-                dstOffset = IntOffset(dstOffset.x + offset.x, dstOffset.y + offset.y),
-                dstSize = dstSize,
-                colorFilter = ColorFilter.tint(Color.White),
-                filterQuality = FilterQuality.High
-            )
-        }
-        
-        drawImage(
-            image = imageBitmap,
-            srcOffset = IntOffset.Zero,
-            srcSize = IntSize(imageBitmap.width, imageBitmap.height),
-            dstOffset = dstOffset,
-            dstSize = dstSize,
-            colorFilter = null,
-            filterQuality = FilterQuality.High
-        )
+        val offsets = listOf(IntOffset(-strokePx, -strokePx), IntOffset(0, -strokePx), IntOffset(strokePx, -strokePx), IntOffset(-strokePx, 0), IntOffset(strokePx, 0), IntOffset(-strokePx, strokePx), IntOffset(0, strokePx), IntOffset(strokePx, strokePx))
+        offsets.forEach { offset -> drawImage(image = imageBitmap, srcOffset = IntOffset.Zero, srcSize = IntSize(imageBitmap.width, imageBitmap.height), dstOffset = IntOffset(dstOffset.x + offset.x, dstOffset.y + offset.y), dstSize = dstSize, colorFilter = ColorFilter.tint(Color.White), filterQuality = FilterQuality.High) }
+        drawImage(image = imageBitmap, srcOffset = IntOffset.Zero, srcSize = IntSize(imageBitmap.width, imageBitmap.height), dstOffset = dstOffset, dstSize = dstSize, colorFilter = null, filterQuality = FilterQuality.High)
     }
 }
 
 @Composable
 private fun BrandRank(items: List<Drink>) {
     val ranking = remember(items) {
-        items.groupBy { it.brand }
-            .map { (brand, list) -> Triple(brand, list.size, list.sumOf { it.price }) }
-            .sortedByDescending { it.second }
+        items.groupBy { it.brand }.map { (brand, list) -> Triple(brand, list.size, list.sumOf { it.price }) }.sortedByDescending { it.second }
     }
     val max = ranking.firstOrNull()?.second ?: 1
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items(ranking, key = { it.first }) { (brandName, count, spend) ->
             val brand = Catalog.brandOf(brandName)
             val color = Color(brand.color)
@@ -685,15 +609,9 @@ private fun BrandRank(items: List<Drink>) {
 
 @Composable
 private fun TimelineView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
-    val grouped = remember(items) {
-        items.groupBy { TimeUtil.monthKey(it.timestamp) }.toSortedMap(compareByDescending { it })
-    }
+    val grouped = remember(items) { items.groupBy { TimeUtil.monthKey(it.timestamp) }.toSortedMap(compareByDescending { it }) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         grouped.forEach { (month, teas) ->
             item(key = "header_$month") {
                 Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -704,9 +622,7 @@ private fun TimelineView(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
                     }
                 }
             }
-            items(teas, key = { it.id }) { tea ->
-                TimelineRow(tea = tea, onClick = { onOpenDetail(tea) })
-            }
+            items(teas, key = { it.id }) { tea -> TimelineRow(tea = tea, onClick = { onOpenDetail(tea) }) }
         }
     }
 }
