@@ -10,8 +10,6 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,7 +32,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -185,6 +182,16 @@ fun DrinkRoot() {
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val scope = rememberCoroutineScope()
 
+    // 👇 核心改动 1：用一个独立的本地状态记录当前选中的 Tab
+    var currentTab by remember { mutableIntStateOf(0) }
+
+    // 监听滑动，如果通过手势滑动，同步更新 currentTab
+    LaunchedEffect(pagerState.currentPage) {
+        if (currentTab != pagerState.currentPage) {
+            currentTab = pagerState.currentPage
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F5F0))) {
         HorizontalPager(
             state = pagerState,
@@ -206,7 +213,10 @@ fun DrinkRoot() {
                             scope.launch { pagerState.animateScrollToPage(3) }
                         }
                     },
-                    onOpenWall = { scope.launch { pagerState.animateScrollToPage(1) } },
+                    onOpenWall = { 
+                        currentTab = 1 // 👈 立即切换状态
+                        scope.launch { pagerState.animateScrollToPage(1) } 
+                    },
                     onOpenDetail = { detail = it },
                 )
                 1 -> WallScreen(
@@ -222,9 +232,9 @@ fun DrinkRoot() {
         }
 
         MilkBottomBar(
-            hazeState = hazeState,
-            pagerState = pagerState,
+            currentTab = currentTab, // 👈 传入当前 Tab
             onSelect = { index ->
+                currentTab = index // 👈 点击瞬间直接变色，不等滑动
                 scope.launch { pagerState.animateScrollToPage(index) }
             },
             onRecord = {
@@ -254,6 +264,7 @@ fun DrinkRoot() {
                 showRecord = false
                 editing = null
                 aiImage = null
+                currentTab = 3 // 👈 立即切换
                 scope.launch { pagerState.animateScrollToPage(3) }
             },
             onPick = { forAi, fromCamera -> requestPick(forAi, fromCamera, openSheet = false) },
@@ -304,11 +315,10 @@ fun DrinkRoot() {
     }
 }
 
-// ================= 新版底栏（纯白胶囊 + 黑底加号） =================
+// ================= 新版底栏（无阴影 + 瞬间变色） =================
 @Composable
 private fun MilkBottomBar(
-    hazeState: HazeState,
-    pagerState: PagerState,
+    currentTab: Int, // 👈 接收传入的状态
     onSelect: (Int) -> Unit,
     onRecord: () -> Unit,
     modifier: Modifier = Modifier,
@@ -317,30 +327,18 @@ private fun MilkBottomBar(
         modifier = modifier
             .fillMaxWidth()
             .height(64.dp)
-            .shadow(
-                elevation = 16.dp,
-                shape = RoundedCornerShape(32.dp),
-                ambientColor = Color.Black.copy(alpha = 0.05f),
-                spotColor = Color.Black.copy(alpha = 0.1f)
-            )
             .clip(RoundedCornerShape(32.dp))
             .background(Color.White),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        BottomBarIcon(tabs[0].icon, pagerState.currentPage == 0) { onSelect(0) }
-        BottomBarIcon(tabs[1].icon, pagerState.currentPage == 1) { onSelect(1) }
+        BottomBarIcon(tabs[0].icon, currentTab == 0) { onSelect(0) }
+        BottomBarIcon(tabs[1].icon, currentTab == 1) { onSelect(1) }
 
         // 正中间的纯黑加号按钮
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .shadow(
-                    elevation = 8.dp,
-                    shape = CircleShape,
-                    ambientColor = Color.Black.copy(alpha = 0.3f),
-                    spotColor = Color.Black.copy(alpha = 0.3f)
-                )
                 .clip(CircleShape)
                 .background(Color.Black)
                 .clickable { onRecord() },
@@ -354,8 +352,8 @@ private fun MilkBottomBar(
             )
         }
 
-        BottomBarIcon(tabs[2].icon, pagerState.currentPage == 2) { onSelect(2) }
-        BottomBarIcon(tabs[3].icon, pagerState.currentPage == 3) { onSelect(3) }
+        BottomBarIcon(tabs[2].icon, currentTab == 2) { onSelect(2) }
+        BottomBarIcon(tabs[3].icon, currentTab == 3) { onSelect(3) }
     }
 }
 
@@ -365,16 +363,9 @@ private fun BottomBarIcon(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val iconTint by animateColorAsState(
-        targetValue = if (isSelected) Color(0xFF1C1C1E) else Color(0xFFB0B0B0),
-        animationSpec = tween(300),
-        label = "iconTint"
-    )
-    val bgColor by animateColorAsState(
-        targetValue = if (isSelected) Color(0xFFF4F5F0) else Color.Transparent,
-        animationSpec = tween(300),
-        label = "bgColor"
-    )
+    // 👇 核心改动 2：去掉了 animateColorAsState，直接瞬间变色，绝对不会闪烁
+    val iconTint = if (isSelected) Color(0xFF1C1C1E) else Color(0xFFB0B0B0)
+    val bgColor = if (isSelected) Color(0xFFF4F5F0) else Color.Transparent
 
     Box(
         modifier = Modifier
