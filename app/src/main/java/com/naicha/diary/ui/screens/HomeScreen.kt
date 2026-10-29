@@ -37,7 +37,6 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,7 +56,6 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -238,6 +236,7 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
+                        // 本月已喝（已去除 +800% 胶囊）
                         Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
                             Column {
                                 Text("本月已喝", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
@@ -245,16 +244,13 @@ fun HomeScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text("$monthCount", fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.Black)
                                     Text(" 杯", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                                    Spacer(Modifier.width(6.dp))
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                                        Text("+800%", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                                    }
                                 }
                             }
                         }
                         
                         Spacer(Modifier.height(12.dp))
                         
+                        // 本月花费
                         Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
                             Column {
                                 Text("本月花费", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
@@ -265,8 +261,6 @@ fun HomeScreen(
                     }
                 }
             }
-
-            // ======== 👇 此处删除了原有的 QuickActions 卡片 👇 ========
 
             // 4. 最近喝过标题与过滤
             item {
