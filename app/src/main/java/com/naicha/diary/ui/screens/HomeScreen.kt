@@ -52,9 +52,7 @@ import com.naicha.diary.ui.components.*
 import com.naicha.diary.ui.theme.*
 import com.naicha.diary.util.PhotoStore
 import com.naicha.diary.util.TimeUtil
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -107,14 +105,8 @@ fun HomeScreen(
     }
     val monthCount = monthItems.size
     val monthSpend = monthItems.sumOf { it.price }
-    
-    // 计算本周记录
-    val weekItemsCount = remember(items) {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
-        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
-        items.count { it.timestamp >= cal.timeInMillis }
-    }
+    // 计算本月平均花费
+    val avgSpend = if (monthCount == 0) 0.0 else monthSpend / monthCount
 
     val processedItems = remember(items, selectedCategory, sortOrder, searchQuery, activeQuickFilter) {
         var result = items
@@ -206,21 +198,26 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(160.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 左侧大卡片：总记录数量
+                    // 👇 左侧大卡片：本月已喝
                     Box(
                         modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            Text("总记录数量", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
+                            Text("本月已喝", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
                             Spacer(Modifier.height(4.dp))
-                            Text("$totalCount", fontSize = 42.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                            
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text("$monthCount", fontSize = 42.sp, fontWeight = FontWeight.Black, color = Color.Black, lineHeight = 42.sp)
+                                Text(" 杯", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(bottom = 6.dp))
+                            }
                             
                             Spacer(Modifier.weight(1f))
                             
+                            // 👇 底部灰色块：改为总记录数量
                             Box(
                                 modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 4.dp)
                             ) {
-                                Text("本周 +$weekItemsCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                Text("总记录数量：$totalCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
                         }
                         Image(
@@ -231,31 +228,28 @@ fun HomeScreen(
                         )
                     }
 
-                    // 右侧上下卡片
+                    // 👇 右侧上下卡片
                     Column(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // 本月已喝（已去除 +800% 胶囊）
-                        Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
-                            Column {
-                                Text("本月已喝", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
-                                Spacer(Modifier.weight(1f))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("$monthCount", fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.Black)
-                                    Text(" 杯", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                                }
-                            }
-                        }
-                        
-                        Spacer(Modifier.height(12.dp))
-                        
-                        // 本月花费
+                        // 右侧上：本月花费
                         Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
                             Column {
                                 Text("本月花费", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.weight(1f))
                                 Text("¥${formatMoney(monthSpend)}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                            }
+                        }
+                        
+                        Spacer(Modifier.height(12.dp))
+                        
+                        // 右侧下：平均花费
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
+                            Column {
+                                Text("平均花费", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
+                                Spacer(Modifier.weight(1f))
+                                Text("¥${formatMoney(avgSpend)}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.Black)
                             }
                         }
                     }
