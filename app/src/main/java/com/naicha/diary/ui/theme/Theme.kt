@@ -1,9 +1,13 @@
 package com.naicha.diary.ui.theme
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import com.naicha.diary.R
 
 private val DrinkColors = lightColorScheme(
     primary = Caramel,
@@ -36,11 +40,33 @@ private val DrinkColors = lightColorScheme(
     scrim = Color(0x66000000),
 )
 
+// 👇 1. 定义你的 Zcool 字体
+val ZcoolFontFamily = FontFamily(Font(R.font.zcool))
+
+// 👇 2. 将原本的排版配置全部替换为 Zcool 字体
+val ZcoolTypography = Typography(
+    displayLarge = DrinkTypography.displayLarge.copy(fontFamily = ZcoolFontFamily),
+    displayMedium = DrinkTypography.displayMedium.copy(fontFamily = ZcoolFontFamily),
+    displaySmall = DrinkTypography.displaySmall.copy(fontFamily = ZcoolFontFamily),
+    headlineLarge = DrinkTypography.headlineLarge.copy(fontFamily = ZcoolFontFamily),
+    headlineMedium = DrinkTypography.headlineMedium.copy(fontFamily = ZcoolFontFamily),
+    headlineSmall = DrinkTypography.headlineSmall.copy(fontFamily = ZcoolFontFamily),
+    titleLarge = DrinkTypography.titleLarge.copy(fontFamily = ZcoolFontFamily),
+    titleMedium = DrinkTypography.titleMedium.copy(fontFamily = ZcoolFontFamily),
+    titleSmall = DrinkTypography.titleSmall.copy(fontFamily = ZcoolFontFamily),
+    bodyLarge = DrinkTypography.bodyLarge.copy(fontFamily = ZcoolFontFamily),
+    bodyMedium = DrinkTypography.bodyMedium.copy(fontFamily = ZcoolFontFamily),
+    bodySmall = DrinkTypography.bodySmall.copy(fontFamily = ZcoolFontFamily),
+    labelLarge = DrinkTypography.labelLarge.copy(fontFamily = ZcoolFontFamily),
+    labelMedium = DrinkTypography.labelMedium.copy(fontFamily = ZcoolFontFamily),
+    labelSmall = DrinkTypography.labelSmall.copy(fontFamily = ZcoolFontFamily)
+)
+
 @Composable
 fun DrinkTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = DrinkColors,
-        typography = DrinkTypography,
+        typography = ZcoolTypography, // 👈 3. 替换为新的 Zcool 字体排版
         shapes = DrinkShapes,
         content = content,
     )
