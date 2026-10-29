@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,8 +38,10 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -214,6 +217,7 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
     }
 }
 
+// ================= 核心：纯随机碰撞排布，不用死板网格 =================
 @Composable
 private fun DraggableStickerWall(allItems: List<Drink>) {
     val targetItems = remember(allItems) { allItems.take(8) }
@@ -244,53 +248,36 @@ private fun DraggableStickerWall(allItems: List<Drink>) {
             val newItems = targetItems.filter { it.id !in currentIds }
 
             if (newItems.isNotEmpty()) {
-                // 为了像图片一样平铺散开，这里采用了宽松的网格
-                val cols = 4
-                val rows = 3
-                val padding = with(density) { 12.dp.toPx() }
-                val availableW = maxWidthPx - 2 * padding - cardSizePx
-                val availableH = maxHeightPx - 2 * padding - cardSizePx
-                val cellW = availableW / (cols - 1)
-                val cellH = availableH / (rows - 1)
-
-                val occupiedCells = nodes.map { 
-                    val cx = ((it.offsetX - padding) / cellW).roundToInt().coerceIn(0, cols - 1)
-                    val cy = ((it.offsetY - padding) / cellH).roundToInt().coerceIn(0, rows - 1)
-                    cx to cy
-                }.toMutableSet()
-
                 newItems.forEach { tea ->
-                    val random = Random(tea.id.hashCode() + System.currentTimeMillis().toInt()) 
-                    
-                    var col = 0
-                    var row = 0
-                    var found = false
-                    for (r in 0 until rows) {
-                        for (c in 0 until cols) {
-                            if (!occupiedCells.contains(c to r)) {
-                                col = c
-                                row = r
-                                found = true
-                                break
-                            }
+                    // 👇 核心算法：尝试最多 100 次随机位置，直到找到一个不重叠的地方
+                    var placed = false
+                    var attempts = 0
+                    val random = Random(tea.id.hashCode() + System.currentTimeMillis().toInt())
+
+                    while (!placed && attempts < 100) {
+                        // 减去 cardSizePx，确保贴纸不会超出卡片边界
+                        val randomX = random.nextFloat() * (maxWidthPx - cardSizePx)
+                        val randomY = random.nextFloat() * (maxHeightPx - cardSizePx)
+
+                        // 检查是否和其他贴纸太近（乘以 0.85 留出一点间距，但不至于太远）
+                        val isOverlapping = nodes.any { 
+                            abs(randomX - it.offsetX) < cardSizePx * 0.85f && abs(randomY - it.offsetY) < cardSizePx * 0.85f 
                         }
-                        if (found) break
+
+                        if (!isOverlapping) {
+                            // 找到空位了，放入节点
+                            nodes.add(StickerNode(tea, randomX, randomY, random.nextFloat() * 30f - 15f))
+                            placed = true
+                        }
+                        attempts++
                     }
-                    if (!found) {
-                        col = random.nextInt(cols)
-                        row = random.nextInt(rows)
-                    } else {
-                        occupiedCells.add(col to row)
+                    
+                    // 如果真的全满了（极少情况），那就强行随便塞一个
+                    if (!placed) {
+                        val randomX = random.nextFloat() * (maxWidthPx - cardSizePx)
+                        val randomY = random.nextFloat() * (maxHeightPx - cardSizePx)
+                        nodes.add(StickerNode(tea, randomX, randomY, random.nextFloat() * 30f - 15f))
                     }
-
-                    // 增加错落感：X 和 Y 轴加入大幅度的随机抖动
-                    val jitterX = (random.nextFloat() - 0.5f) * cellW * 0.7f
-                    val jitterY = (random.nextFloat() - 0.5f) * cellH * 0.7f
-
-                    val x = padding + col * cellW + jitterX
-                    val y = padding + row * cellH + jitterY
-
-                    nodes.add(StickerNode(tea, x.coerceIn(0f, maxWidthPx - cardSizePx), y.coerceIn(0f, maxHeightPx - cardSizePx), random.nextFloat() * 24f - 12f))
                 }
             }
         }
@@ -354,7 +341,6 @@ private fun DraggableStickerItem(
                         var targetX = (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
                         var targetY = (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
                         
-                        // 松手时如果重叠，强制弹开
                         var iterations = 0
                         while (iterations < 5) {
                             var collided = false
@@ -394,44 +380,54 @@ private fun DraggableStickerItem(
     }
 }
 
-// 图片兜底逻辑
+// 👇 修复核心：如果读不到本地抠图，强制使用预设的矢量图，防止“贴纸消失”
 @Composable
 fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
     val customBitmap = remember(tea) { if (tea.photoPath != null) StickerImageCache.getImage(tea) else null }
-    val imageBitmap = customBitmap ?: ImageBitmap.imageResource(id = getDrinkIconRes(tea))
-
-    Canvas(modifier = modifier) {
-        val imgWidth = imageBitmap.width.toFloat()
-        val imgHeight = imageBitmap.height.toFloat()
-        val canvasRatio = size.width / size.height
-        val imgRatio = imgWidth / imgHeight
-        val drawWidth: Float; val drawHeight: Float
-        if (canvasRatio > imgRatio) { drawHeight = size.height; drawWidth = drawHeight * imgRatio } else { drawWidth = size.width; drawHeight = drawWidth / imgRatio }
-        val dx = (size.width - drawWidth) / 2f; val dy = (size.height - drawHeight) / 2f
-        val dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt()); val dstOffset = IntOffset(dx.toInt(), dy.toInt())
-        
-        val strokePx = 2.dp.toPx().toInt()
-        val offsets = listOf(IntOffset(-strokePx, -strokePx), IntOffset(0, -strokePx), IntOffset(strokePx, -strokePx), IntOffset(-strokePx, 0), IntOffset(strokePx, 0), IntOffset(-strokePx, strokePx), IntOffset(0, strokePx), IntOffset(strokePx, strokePx))
-        
-        offsets.forEach { offset -> 
+    
+    // 如果 customBitmap 读到了，就画带白边的 Bitmap
+    if (customBitmap != null) {
+        Canvas(modifier = modifier) {
+            val imgWidth = customBitmap.width.toFloat()
+            val imgHeight = customBitmap.height.toFloat()
+            val canvasRatio = size.width / size.height
+            val imgRatio = imgWidth / imgHeight
+            val drawWidth: Float; val drawHeight: Float
+            if (canvasRatio > imgRatio) { drawHeight = size.height; drawWidth = drawHeight * imgRatio } else { drawWidth = size.width; drawHeight = drawWidth / imgRatio }
+            val dx = (size.width - drawWidth) / 2f; val dy = (size.height - drawHeight) / 2f
+            val dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt()); val dstOffset = IntOffset(dx.toInt(), dy.toInt())
+            
+            val strokePx = 2.dp.toPx().toInt()
+            val offsets = listOf(IntOffset(-strokePx, -strokePx), IntOffset(0, -strokePx), IntOffset(strokePx, -strokePx), IntOffset(-strokePx, 0), IntOffset(strokePx, 0), IntOffset(-strokePx, strokePx), IntOffset(0, strokePx), IntOffset(strokePx, strokePx))
+            
+            offsets.forEach { offset -> 
+                drawImage(
+                    image = customBitmap, 
+                    srcOffset = IntOffset.Zero, 
+                    srcSize = IntSize(customBitmap.width, customBitmap.height), 
+                    dstOffset = IntOffset(dstOffset.x + offset.x, dstOffset.y + offset.y), 
+                    dstSize = dstSize, 
+                    colorFilter = ColorFilter.tint(Color.White), 
+                    filterQuality = FilterQuality.High
+                ) 
+            }
             drawImage(
-                image = imageBitmap, 
+                image = customBitmap, 
                 srcOffset = IntOffset.Zero, 
-                srcSize = IntSize(imageBitmap.width, imageBitmap.height), 
-                dstOffset = IntOffset(dstOffset.x + offset.x, dstOffset.y + offset.y), 
+                srcSize = IntSize(customBitmap.width, customBitmap.height), 
+                dstOffset = dstOffset, 
                 dstSize = dstSize, 
-                colorFilter = ColorFilter.tint(Color.White), 
+                colorFilter = null, 
                 filterQuality = FilterQuality.High
-            ) 
+            )
         }
-        drawImage(
-            image = imageBitmap, 
-            srcOffset = IntOffset.Zero, 
-            srcSize = IntSize(imageBitmap.width, imageBitmap.height), 
-            dstOffset = dstOffset, 
-            dstSize = dstSize, 
-            colorFilter = null, 
-            filterQuality = FilterQuality.High
+    } else {
+        // 👇 如果读不到图（比如刚重启），直接降级为普通的预设图片，保证 100% 显示！
+        Image(
+            painter = painterResource(id = getDrinkIconRes(tea)),
+            contentDescription = null,
+            modifier = modifier.padding(4.dp),
+            contentScale = ContentScale.Fit
         )
     }
 }
