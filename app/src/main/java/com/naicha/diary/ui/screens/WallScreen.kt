@@ -10,7 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures // 👈 修复了这里
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -54,7 +54,7 @@ import com.naicha.diary.ui.components.*
 import com.naicha.diary.ui.theme.*
 import com.naicha.diary.util.PhotoStore
 import com.naicha.diary.util.TimeUtil
-import kotlinx.coroutines.launch // 👈 补上了这个
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
