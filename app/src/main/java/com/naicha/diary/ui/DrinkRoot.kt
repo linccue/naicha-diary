@@ -393,207 +393,116 @@ private fun RecordFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalHazeApi::class)
 @Composable
 private fun MilkBottomBar(
-    hazeState: HazeState,
+    hazeState: HazeState, // 保留参数防止报错，但不再使用毛玻璃
     pagerState: PagerState,
     onSelect: (Int) -> Unit,
     onRecord: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val barShape = RoundedCornerShape(42.dp)
-    val slotCount = tabs.size + 1
-    val gap = 4.dp
-    val haptics = rememberHaptics()
-
-    // 手指在底栏上滑动时，玻璃内部的光随之流动
-    var fingerX by remember { mutableFloatStateOf(-400f) }
-    var touching by remember { mutableStateOf(false) }
-    val glowX = animateFloatAsState(
-        targetValue = fingerX,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = 380f),
-        label = "glowX",
-    )
-    val glowAlpha = animateFloatAsState(
-        targetValue = if (touching) 1f else 0f,
-        animationSpec = tween(if (touching) 140 else 480),
-        label = "glowAlpha",
-    )
-    var lastHapticPage by remember { mutableIntStateOf(0) }
-
-    // 页面滑动经过时给一次轻触感
-    LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage != lastHapticPage) {
-            lastHapticPage = pagerState.currentPage
-            haptics.tick()
-        }
-    }
-
-    BoxWithConstraints(
+    // 整体的纯白悬浮胶囊
+    Row(
         modifier = modifier
             .fillMaxWidth()
+            .height(64.dp)
             .shadow(
-                elevation = 22.dp,
-                shape = barShape,
-                ambientColor = Caramel.copy(alpha = 0.40f),
-                spotColor = Caramel.copy(alpha = 0.40f),
+                elevation = 16.dp,
+                shape = RoundedCornerShape(32.dp),
+                ambientColor = Color.Black.copy(alpha = 0.05f),
+                spotColor = Color.Black.copy(alpha = 0.1f)
             )
-            .clip(barShape)
-            .hazeChild(state = hazeState) {
-                blurRadius = 48.dp
-                noiseFactor = 0.03f
-                backgroundColor = Color.Transparent
-                tints = listOf(HazeTint(Color.White.copy(alpha = 0.09f)))
-            }
-            .border(
-                width = 1.2.dp,
-                brush = Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.92f),
-                        Color.White.copy(alpha = 0.30f),
-                        Color.White.copy(alpha = 0.10f),
-                    )
-                ),
-                shape = barShape,
-            )
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull() ?: continue
-                        touching = change.pressed
-                        if (change.pressed) fingerX = change.position.x
-                    }
-                }
-            }
-            .padding(horizontal = 9.dp, vertical = 10.dp),
+            .clip(RoundedCornerShape(32.dp))
+            .background(Color.White),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        val slotWidth = (maxWidth - gap * (slotCount - 1)) / slotCount
+        // 左侧 2 个图标
+        BottomBarIcon(tabs[0].icon, pagerState.currentPage == 0) { onSelect(0) }
+        BottomBarIcon(tabs[1].icon, pagerState.currentPage == 1) { onSelect(1) }
 
-        // 连续位置：跳过中间的加号槽位
-        val continuous = pagerState.currentPage + pagerState.currentPageOffsetFraction
-        val slotPos = if (continuous < RECORD_SLOT - 0.5f) continuous else continuous + 1f
-
-        Box {
-            // 玻璃流光（跟随手指，带弹簧阻尼）
-            Box(
-                modifier = Modifier
-                    .graphicsLayer {
-                        translationX = glowX.value - 90f
-                        alpha = glowAlpha.value * 0.75f
-                    }
-                    .width(180.dp)
-                    .height(62.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Transparent,
-                                Color.White.copy(alpha = 0.42f),
-                                Color.White.copy(alpha = 0.62f),
-                                Color.White.copy(alpha = 0.42f),
-                                Color.Transparent,
-                            )
-                        ),
-                        RoundedCornerShape(32.dp),
-                    )
-            )
-
-            // 滑动指示器
-            Box(
-                modifier = Modifier
-                    .offset(x = (slotWidth + gap) * slotPos)
-                    .width(slotWidth)
-                    .height(62.dp)
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(
-                        Brush.horizontalGradient(listOf(Caramel, Color(0xFFE0A574)))
-                    ),
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(gap),
-            ) {
-                tabs.forEachIndexed { index, item ->
-                    if (index == RECORD_SLOT) {
-                        RecordButton(onClick = onRecord, modifier = Modifier.width(slotWidth))
-                    }
-                    val selected = pagerState.currentPage == index
-                    Box(
-                        modifier = Modifier
-                            .width(slotWidth)
-                            .height(62.dp)
-                            .clip(RoundedCornerShape(32.dp))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) {
-                                haptics.tick()
-                                onSelect(index)
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = item.icon,
-                                contentDescription = item.label,
-                                tint = if (selected) Color.White else PearlSoft,
-                                modifier = Modifier.size(25.dp),
-                            )
-                            Spacer(Modifier.height(3.dp))
-                            Text(
-                                text = item.label,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (selected) Color.White else PearlSoft,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            )
-                        }
-                    }
-                }
-                if (RECORD_SLOT >= tabs.size) {
-                    RecordButton(onClick = onRecord, modifier = Modifier.width(slotWidth))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    BouncyBox(onClick = onClick, modifier = modifier) {
+        // 👇 正中间的纯黑加号按钮
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(62.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(50.dp)
-                    .shadow(
-                        elevation = 14.dp,
-                        shape = CircleShape,
-                        ambientColor = Caramel.copy(alpha = 0.7f),
-                        spotColor = Caramel.copy(alpha = 0.7f),
-                    )
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(Color(0xFFE2A776), Caramel, Color(0xFFB0724A))
-                        )
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = "记一杯",
-                    tint = Color.White,
-                    modifier = Modifier.size(27.dp),
+                .size(48.dp)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = CircleShape,
+                    ambientColor = Color.Black.copy(alpha = 0.3f),
+                    spotColor = Color.Black.copy(alpha = 0.3f)
                 )
-            }
+                .clip(CircleShape)
+                .background(Color.Black)
+                .clickable { onRecord() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = "记一杯",
+                tint = Color.White,
+                modifier = Modifier.size(26.dp)
+            )
         }
+
+        // 右侧 2 个图标
+        BottomBarIcon(tabs[2].icon, pagerState.currentPage == 2) { onSelect(2) }
+        BottomBarIcon(tabs[3].icon, pagerState.currentPage == 3) { onSelect(3) }
     }
 }
 
+// 提取出来的单个图标组件（带选中动画）
+@Composable
+private fun BottomBarIcon(
+    icon: ImageVector,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    // 选中时变黑，未选中时是浅灰色
+    val iconTint by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF1C1C1E) else Color(0xFFB0B0B0),
+        animationSpec = androidx.compose.animation.core.tween(300),
+        label = "iconTint"
+    )
+    // 选中时背后浮现极浅的灰色圆角背景
+    val bgColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isSelected) Color(0xFFF4F5F0) else Color.Transparent,
+        animationSpec = androidx.compose.animation.core.tween(300),
+        label = "bgColor"
+    )
+
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(bgColor)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(26.dp)
+        )
+    }
+}
+
+// ================= 保留的相机 URI 生成工具函数 =================
+private fun createCameraUri(context: Context): Uri? = runCatching {
+    val name = "drink_${System.currentTimeMillis()}.jpg"
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(
+                MediaStore.Images.Media.RELATIVE_PATH,
+                Environment.DIRECTORY_PICTURES + "/饮品日记",
+            )
+        }
+        context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+    } else {
+        val dir = File(context.cacheDir, "capture").apply { mkdirs() }
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", File(dir, name))
+    }
+}.getOrNull()
 private fun createCameraUri(context: Context): Uri? = runCatching {
     val name = "drink_${System.currentTimeMillis()}.jpg"
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
