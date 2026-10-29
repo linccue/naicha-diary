@@ -10,7 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures // 👈 修复了这里
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -112,6 +112,7 @@ fun WallScreen(
 
     val stickerNodes = remember { mutableStateListOf<StickerNode>() }
 
+    // 监听数据变化：如果是删除，会移除对应节点；如果是新增，Wall 组件内部会自动处理添加
     LaunchedEffect(sorted) {
         val currentItems = sorted.take(8)
         val currentIds = currentItems.map { it.id }.toSet()
@@ -240,6 +241,7 @@ private fun DraggableStickerWall(allItems: List<Drink>, nodes: SnapshotStateList
 
         LaunchedEffect(targetItems, maxWidthPx, maxHeightPx) {
             if (maxWidthPx <= 0f || maxHeightPx <= 0f) return@LaunchedEffect
+            
             val currentIds = nodes.map { it.tea.id }.toSet()
             val newItems = targetItems.filter { it.id !in currentIds }
 
@@ -395,6 +397,52 @@ private fun DraggableStickerItem(
     }
 }
 
+// 👇 核心修复：如果读不到抠图文件，自动降级显示对应的线稿图
+@Composable
+fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
+    val customBitmap = remember(tea) { if (tea.photoPath != null) StickerImageCache.getImage(tea) else null }
+    
+    // 读不到图就兜底用预设图
+    val imageBitmap = customBitmap ?: ImageBitmap.imageResource(id = getDrinkIconRes(tea))
+
+    Canvas(modifier = modifier) {
+        val imgWidth = imageBitmap.width.toFloat()
+        val imgHeight = imageBitmap.height.toFloat()
+        val canvasRatio = size.width / size.height
+        val imgRatio = imgWidth / imgHeight
+        val drawWidth: Float; val drawHeight: Float
+        if (canvasRatio > imgRatio) { drawHeight = size.height; drawWidth = drawHeight * imgRatio } else { drawWidth = size.width; drawHeight = drawWidth / imgRatio }
+        val dx = (size.width - drawWidth) / 2f; val dy = (size.height - drawHeight) / 2f
+        val dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt()); val dstOffset = IntOffset(dx.toInt(), dy.toInt())
+        
+        val strokePx = 2.dp.toPx().toInt()
+        val offsets = listOf(IntOffset(-strokePx, -strokePx), IntOffset(0, -strokePx), IntOffset(strokePx, -strokePx), IntOffset(-strokePx, 0), IntOffset(strokePx, 0), IntOffset(-strokePx, strokePx), IntOffset(0, strokePx), IntOffset(strokePx, strokePx))
+        
+        offsets.forEach { offset -> 
+            drawImage(
+                image = imageBitmap, 
+                srcOffset = IntOffset.Zero, 
+                srcSize = IntSize(imageBitmap.width, imageBitmap.height), 
+                dstOffset = IntOffset(dstOffset.x + offset.x, dstOffset.y + offset.y), 
+                dstSize = dstSize, 
+                colorFilter = ColorFilter.tint(Color.White), 
+                filterQuality = FilterQuality.High
+            ) 
+        }
+        drawImage(
+            image = imageBitmap, 
+            srcOffset = IntOffset.Zero, 
+            srcSize = IntSize(imageBitmap.width, imageBitmap.height), 
+            dstOffset = dstOffset, 
+            dstSize = dstSize, 
+            colorFilter = null, 
+            filterQuality = FilterQuality.High
+        )
+    }
+}
+
+// ================= 以下为日历、列表等保留代码 =================
+
 @Composable
 private fun CalendarCard(
     currentMonth: Calendar,
@@ -535,30 +583,6 @@ private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
                 }
             }
         }
-    }
-}
-
-@Composable
-fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
-    val defaultBitmap = if (tea.photoPath == null) ImageBitmap.imageResource(id = getDrinkIconRes(tea)) else null
-    val customBitmap = remember(tea) { if (tea.photoPath != null) StickerImageCache.getImage(tea) else null }
-    val imageBitmap = customBitmap ?: defaultBitmap
-
-    if (imageBitmap == null) return
-
-    Canvas(modifier = modifier) {
-        val imgWidth = imageBitmap.width.toFloat()
-        val imgHeight = imageBitmap.height.toFloat()
-        val canvasRatio = size.width / size.height
-        val imgRatio = imgWidth / imgHeight
-        val drawWidth: Float; val drawHeight: Float
-        if (canvasRatio > imgRatio) { drawHeight = size.height; drawWidth = drawHeight * imgRatio } else { drawWidth = size.width; drawHeight = drawWidth / imgRatio }
-        val dx = (size.width - drawWidth) / 2f; val dy = (size.height - drawHeight) / 2f
-        val dstSize = IntSize(drawWidth.toInt(), drawHeight.toInt()); val dstOffset = IntOffset(dx.toInt(), dy.toInt())
-        val strokePx = 2.dp.toPx().toInt()
-        val offsets = listOf(IntOffset(-strokePx, -strokePx), IntOffset(0, -strokePx), IntOffset(strokePx, -strokePx), IntOffset(-strokePx, 0), IntOffset(strokePx, 0), IntOffset(-strokePx, strokePx), IntOffset(0, strokePx), IntOffset(strokePx, strokePx))
-        offsets.forEach { offset -> drawImage(image = imageBitmap, srcOffset = IntOffset.Zero, srcSize = IntSize(imageBitmap.width, imageBitmap.height), dstOffset = IntOffset(dstOffset.x + offset.x, dstOffset.y + offset.y), dstSize = dstSize, colorFilter = ColorFilter.tint(Color.White), filterQuality = FilterQuality.High) }
-        drawImage(image = imageBitmap, srcOffset = IntOffset.Zero, srcSize = IntSize(imageBitmap.width, imageBitmap.height), dstOffset = dstOffset, dstSize = dstSize, colorFilter = null, filterQuality = FilterQuality.High)
     }
 }
 
