@@ -192,8 +192,8 @@ fun HomeScreen(
                 }
             }
 
-            // 2. 三块数据统计卡片
-                      // 2. 三块数据统计卡片
+           
+                                 // 2. 三块数据统计卡片
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(160.dp),
@@ -218,8 +218,8 @@ fun HomeScreen(
                                     text = "$monthCount", 
                                     fontSize = 44.sp, 
                                     fontWeight = FontWeight.Bold, 
-                                    color = Color.Black,
-                                    includeFontPadding = false // 👈 防止底部被裁切
+                                    color = Color.Black
+                                    // 👈 删掉了这里的 includeFontPadding
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
@@ -268,8 +268,8 @@ fun HomeScreen(
                                     text = "¥${formatMoney(monthSpend)}", 
                                     fontSize = 24.sp, 
                                     fontWeight = FontWeight.Bold, 
-                                    color = Color.Black,
-                                    includeFontPadding = false // 👈 防止底部被裁切
+                                    color = Color.Black
+                                    // 👈 删掉了这里的 includeFontPadding
                                 )
                             }
                         }
@@ -285,8 +285,8 @@ fun HomeScreen(
                                     text = "¥${formatMoney(avgSpend)}", 
                                     fontSize = 24.sp, 
                                     fontWeight = FontWeight.Bold, 
-                                    color = Color.Black,
-                                    includeFontPadding = false // 👈 防止底部被裁切
+                                    color = Color.Black
+                                    // 👈 删掉了这里的 includeFontPadding
                                 )
                             }
                         }
