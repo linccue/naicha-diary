@@ -10,9 +10,9 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -307,7 +307,7 @@ fun DrinkRoot() {
 // ================= 新版底栏（纯白胶囊 + 黑底加号） =================
 @Composable
 private fun MilkBottomBar(
-    hazeState: HazeState, // 保留参数但未使用，防止上层报错
+    hazeState: HazeState,
     pagerState: PagerState,
     onSelect: (Int) -> Unit,
     onRecord: () -> Unit,
@@ -393,7 +393,7 @@ private fun BottomBarIcon(
     }
 }
 
-// ================= 相机 URI 生成工具函数（只保留这一个） =================
+// ================= 相机 URI 生成工具函数 =================
 private fun createCameraUri(context: Context): Uri? = runCatching {
     val name = "drink_${System.currentTimeMillis()}.jpg"
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
