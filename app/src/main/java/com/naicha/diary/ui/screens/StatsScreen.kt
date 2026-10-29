@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -40,6 +41,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     val avgPrice = if (total == 0) 0.0 else totalSpend / total
     val streak = remember(items) { currentStreak(items) }
     val avgRating = if (total == 0) 0f else items.map { it.rating }.sum() / total
+
     Box(modifier.fillMaxSize()) {
         PearlField(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F5F0)), count = 12, seed = 23)
 
@@ -86,18 +88,9 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                         SectionHeader(title = "甜度偏好", subtitle = "你的甜度人格")
                         Spacer(Modifier.height(14.dp))
                         PreferenceBars(
-                    entries = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖").map { sugar ->
-    sugar to items.count { it.sugar == sugar }},
+                            entries = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖").map { sugar -> sugar to items.count { it.sugar == sugar } },
                             colors = emptyList()
                         )
-                    }
-                }
-
-                item {
-                    StatsCard {
-                        SectionHeader(title = "本月日历", subtitle = "每天喝了几杯")
-                        Spacer(Modifier.height(14.dp))
-                        MonthHeatmap(items = items)
                     }
                 }
 
@@ -125,20 +118,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     }
 }
 
-// ================= 专用的纯白卡片组件 =================
-@Composable
-fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.White) // 强制纯白背景 #FFFFFF
-            .padding(20.dp),
-        content = content
-    )
-}
-
-// ================= 顶部数据卡片 =================
+// ================= 高级极简质感数据卡片 =================
 @Composable
 fun StatPill(
     label: String,
@@ -149,7 +129,7 @@ fun StatPill(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White) // 强制纯白背景 #FFFFFF
+            .background(Color.White)
             .shadow(elevation = 2.dp, shape = RoundedCornerShape(20.dp), ambientColor = Color.Black.copy(0.05f), spotColor = Color.Black.copy(0.05f))
             .padding(horizontal = 14.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -178,6 +158,18 @@ fun StatPill(
             maxLines = 1
         )
     }
+}
+
+@Composable
+fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.White)
+            .padding(20.dp),
+        content = content
+    )
 }
 
 // ================= 下方各模块组件 =================
@@ -459,56 +451,6 @@ private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>
                     modifier = Modifier.width(20.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.End
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MonthHeatmap(items: List<Drink>) {
-    val calendar = remember { Calendar.getInstance() }
-    val year = calendar.get(Calendar.YEAR)
-    val month = calendar.get(Calendar.MONTH)
-    val today = calendar.get(Calendar.DAY_OF_MONTH)
-    val dayRecords = remember(items, year, month) {
-        items.filter {
-            val c = Calendar.getInstance().apply { timeInMillis = it.timestamp }
-            c.get(Calendar.YEAR) == year && c.get(Calendar.MONTH) == month
-        }.groupBy {
-            Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.DAY_OF_MONTH)
-        }
-    }
-    val first = Calendar.getInstance().apply { set(Calendar.YEAR, year); set(Calendar.MONTH, month); set(Calendar.DAY_OF_MONTH, 1) }
-    val leading = (first.get(Calendar.DAY_OF_WEEK) + 5) % 7
-    val daysInMonth = first.getActualMaximum(Calendar.DAY_OF_MONTH)
-
-    Column {
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-            listOf("一", "二", "三", "四", "五", "六", "日").forEach { label ->
-                Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-            }
-        }
-        val cells = leading + daysInMonth
-        val rows = (cells + 6) / 7
-        repeat(rows) { row ->
-            Row(modifier = Modifier.fillMaxWidth()) {
-                repeat(7) { col ->
-                    val index = row * 7 + col
-                    val day = index - leading + 1
-                    Box(modifier = Modifier.weight(1f).aspectRatio(1f).padding(6.dp), contentAlignment = Alignment.Center) {
-                        if (day in 1..daysInMonth) {
-                            val drinksOfDay = dayRecords[day]
-                            if (!drinksOfDay.isNullOrEmpty()) {
-                                val brand = Catalog.brandOf(drinksOfDay.first().brand)
-                                BrandBadge(badge = brand.badge, color = Color(brand.color), size = 32.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
-                            } else {
-                                Text(text = day.toString(), style = MaterialTheme.typography.titleMedium, color = if (day == today) Caramel else MaterialTheme.colorScheme.onSurface, fontWeight = if (day == today) FontWeight.Bold else FontWeight.Normal)
-                            }
-                        } else {
-                            Spacer(Modifier.fillMaxSize())
-                        }
-                    }
-                }
             }
         }
     }
