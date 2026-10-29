@@ -193,33 +193,59 @@ fun HomeScreen(
             }
 
             // 2. 三块数据统计卡片
+                      // 2. 三块数据统计卡片
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(160.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 👇 左侧大卡片：本月已喝
+                    // 左侧大卡片：本月已喝
                     Box(
                         modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            Text("本月已喝", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
+                            Text(
+                                text = "本月已喝", 
+                                fontSize = 13.sp, 
+                                color = Color(0xFF888888), 
+                                fontWeight = FontWeight.Medium
+                            )
+                            
                             Spacer(Modifier.height(4.dp))
                             
                             Row(verticalAlignment = Alignment.Bottom) {
-                                Text("$monthCount", fontSize = 42.sp, fontWeight = FontWeight.Black, color = Color.Black, lineHeight = 42.sp)
-                                Text(" 杯", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(bottom = 6.dp))
+                                Text(
+                                    text = "$monthCount", 
+                                    fontSize = 44.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = Color.Black,
+                                    includeFontPadding = false // 👈 防止底部被裁切
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = "杯", 
+                                    fontSize = 16.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = Color.Black,
+                                    modifier = Modifier.padding(bottom = 6.dp)
+                                )
                             }
                             
                             Spacer(Modifier.weight(1f))
                             
-                            // 👇 底部灰色块：改为总记录数量
+                            // 底部灰色胶囊标签
                             Box(
-                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 4.dp)
+                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 5.dp)
                             ) {
-                                Text("总记录数量：$totalCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                Text(
+                                    text = "总记录数量：$totalCount", 
+                                    fontSize = 11.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = Color.Black
+                                )
                             }
                         }
+                        // 背景透明杯子水印
                         Image(
                             painter = painterResource(id = R.drawable.drink_milk_tea_cold),
                             contentDescription = null,
@@ -228,7 +254,7 @@ fun HomeScreen(
                         )
                     }
 
-                    // 👇 右侧上下卡片
+                    // 右侧上下卡片
                     Column(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         verticalArrangement = Arrangement.SpaceBetween
@@ -236,9 +262,15 @@ fun HomeScreen(
                         // 右侧上：本月花费
                         Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
                             Column {
-                                Text("本月花费", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
+                                Text(text = "本月花费", fontSize = 13.sp, color = Color(0xFF888888), fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.weight(1f))
-                                Text("¥${formatMoney(monthSpend)}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                Text(
+                                    text = "¥${formatMoney(monthSpend)}", 
+                                    fontSize = 24.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = Color.Black,
+                                    includeFontPadding = false // 👈 防止底部被裁切
+                                )
                             }
                         }
                         
@@ -247,9 +279,15 @@ fun HomeScreen(
                         // 右侧下：平均花费
                         Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
                             Column {
-                                Text("平均花费", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
+                                Text(text = "平均花费", fontSize = 13.sp, color = Color(0xFF888888), fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.weight(1f))
-                                Text("¥${formatMoney(avgSpend)}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                Text(
+                                    text = "¥${formatMoney(avgSpend)}", 
+                                    fontSize = 24.sp, 
+                                    fontWeight = FontWeight.Bold, 
+                                    color = Color.Black,
+                                    includeFontPadding = false // 👈 防止底部被裁切
+                                )
                             }
                         }
                     }
