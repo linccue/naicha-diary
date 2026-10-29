@@ -73,7 +73,7 @@ object StickerImageCache {
         if (cache.containsKey(key)) return cache[key]
 
         val bitmap = if (tea.photoPath == null) {
-            null // 预设图通过 ImageBitmap.imageResource 加载，无需文件解析
+            null 
         } else {
             val file = PhotoStore.fileOf(tea.photoPath)
             val raw = BitmapFactory.decodeFile(file.absolutePath)
@@ -84,7 +84,6 @@ object StickerImageCache {
     }
 }
 
-// 贴纸状态类
 class StickerNode(
     val tea: Drink,
     val initialX: Float,
@@ -94,7 +93,7 @@ class StickerNode(
     var offsetX by mutableStateOf(initialX)
     var offsetY by mutableStateOf(initialY)
     var isDragging by mutableStateOf(false)
-    var hasAnimated by mutableStateOf(false) // 记录是否播放过动画
+    var hasAnimated by mutableStateOf(false)
 }
 
 @Composable
@@ -113,19 +112,17 @@ fun WallScreen(
     }
     val photoCount = remember(items) { items.count { it.photoPath != null } }
 
-    // 👇 将贴纸节点状态提升到最外层，保证滑动时不丢失、不重播
     val displayItems = remember(sorted) { sorted.take(8) }
     val density = LocalDensity.current
     val cardSize = 64.dp
     val cardSizePx = with(density) { cardSize.toPx() }
 
-    // 使用固定的网格生成算法，保证每次重组得到的初始位置不变
     val nodes = remember(displayItems) {
         val list = mutableListOf<StickerNode>()
         val cols = 3
         val rows = 2
-        val cellWidth = 350f / cols // 假设屏宽大概 350dp
-        val cellHeight = 220f / rows // 框高 220dp
+        val cellWidth = 350f / cols
+        val cellHeight = 220f / rows
         
         val shuffledCells = (0 until (cols * rows)).shuffled()
         
@@ -134,7 +131,6 @@ fun WallScreen(
             val col = cellIndex % cols
             val row = cellIndex / cols
             
-            // 使用随机种子保证同一个贴纸每次计算出的位置抖动是固定的
             val random = Random(tea.id.hashCode())
             val jitterX = (random.nextFloat() - 0.5f) * cellWidth * 0.4f
             val jitterY = (random.nextFloat() - 0.5f) * cellHeight * 0.4f
@@ -207,7 +203,7 @@ fun WallScreen(
             when (mode) {
                 WallMode.Wall -> WallTabContent(
                     items = sorted, 
-                    nodes = nodes, // 传入提升的节点
+                    nodes = nodes,
                     onOpenDetail = onOpenDetail
                 )
                 WallMode.Brand -> BrandRank(items = sorted)
@@ -259,12 +255,10 @@ private fun WallTabContent(
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 1. 贴纸墙
         item {
             DraggableStickerWall(nodes)
         }
 
-        // 2. 日历
         item {
             CalendarCard(
                 currentMonth = currentMonth,
@@ -279,7 +273,6 @@ private fun WallTabContent(
             )
         }
 
-        // 3. 当天记录
         item {
             val dateStr = SimpleDateFormat("d日 EEEE", Locale.CHINA).format(
                 Calendar.getInstance().apply {
@@ -357,7 +350,6 @@ private fun DraggableStickerItem(
     maxX: Float,
     maxY: Float
 ) {
-    // 如果已经动画过了，初始值直接设为最终位置，不再从上往下掉
     val animY = remember { Animatable(if (node.hasAnimated) node.offsetY else -400f) }
     
     LaunchedEffect(Unit) {
@@ -370,7 +362,7 @@ private fun DraggableStickerItem(
                     easing = FastOutSlowInEasing
                 )
             )
-            node.hasAnimated = true // 标记已播放完毕
+            node.hasAnimated = true
         }
     }
 
@@ -381,7 +373,6 @@ private fun DraggableStickerItem(
         modifier = Modifier
             .zIndex(if (node.isDragging) 10f else 1f)
             .offset {
-                // 如果正在播放动画，用动画值；如果播完了，用静态值
                 val curX = if (animY.isRunning) node.offsetX else (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
                 val curY = if (animY.isRunning) animY.value else (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
                 IntOffset(curX.roundToInt(), curY.roundToInt())
@@ -591,11 +582,12 @@ private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
 
 @Composable
 fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
-    // 👇 使用内存缓存，彻底解决滑动卡顿
-    val imageBitmap = remember(tea) {
-        if (tea.photoPath == null) ImageBitmap.imageResource(id = getDrinkIconRes(tea)) 
-        else StickerImageCache.getImage(tea)
+    // 👇 修复：将 ImageBitmap.imageResource 移出 remember 块，避免 Composable 上下文报错
+    val defaultBitmap = if (tea.photoPath == null) ImageBitmap.imageResource(id = getDrinkIconRes(tea)) else null
+    val customBitmap = remember(tea) {
+        if (tea.photoPath != null) StickerImageCache.getImage(tea) else null
     }
+    val imageBitmap = customBitmap ?: defaultBitmap
 
     if (imageBitmap == null) return
 
