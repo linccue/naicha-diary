@@ -193,15 +193,16 @@ fun HomeScreen(
             }
 
            
-                                 // 2. 三块数据统计卡片
+                         // 2. 三块数据统计卡片
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(160.dp),
+                    // 👇 高度从 160.dp 增加到 172.dp，给底部数字留足空间
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(172.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // 左侧大卡片：本月已喝
                     Box(
-                        modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)
+                        modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 14.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             Text(
@@ -218,8 +219,8 @@ fun HomeScreen(
                                     text = "$monthCount", 
                                     fontSize = 44.sp, 
                                     fontWeight = FontWeight.Bold, 
-                                    color = Color.Black
-                                    // 👈 删掉了这里的 includeFontPadding
+                                    color = Color.Black,
+                                    lineHeight = 44.sp // 👈 压缩行高
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(
@@ -260,16 +261,20 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         // 右侧上：本月花费
-                        Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
-                            Column {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.SpaceBetween // 👈 自动把标题推顶，数字推底
+                            ) {
                                 Text(text = "本月花费", fontSize = 13.sp, color = Color(0xFF888888), fontWeight = FontWeight.Medium)
-                                Spacer(Modifier.weight(1f))
                                 Text(
                                     text = "¥${formatMoney(monthSpend)}", 
                                     fontSize = 24.sp, 
                                     fontWeight = FontWeight.Bold, 
-                                    color = Color.Black
-                                    // 👈 删掉了这里的 includeFontPadding
+                                    color = Color.Black,
+                                    lineHeight = 26.sp // 👈 限制行高，防止被切
                                 )
                             }
                         }
@@ -277,16 +282,20 @@ fun HomeScreen(
                         Spacer(Modifier.height(12.dp))
                         
                         // 右侧下：平均花费
-                        Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
-                            Column {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.SpaceBetween // 👈 自动把标题推顶，数字推底
+                            ) {
                                 Text(text = "平均花费", fontSize = 13.sp, color = Color(0xFF888888), fontWeight = FontWeight.Medium)
-                                Spacer(Modifier.weight(1f))
                                 Text(
                                     text = "¥${formatMoney(avgSpend)}", 
                                     fontSize = 24.sp, 
                                     fontWeight = FontWeight.Bold, 
-                                    color = Color.Black
-                                    // 👈 删掉了这里的 includeFontPadding
+                                    color = Color.Black,
+                                    lineHeight = 26.sp // 👈 限制行高，防止被切
                                 )
                             }
                         }
