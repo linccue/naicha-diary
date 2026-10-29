@@ -193,7 +193,7 @@ fun HomeScreen(
                             color = Color.Black
                         )
                     }
-                    // 右侧头像（需要你上传 girl_avatar.png）
+                    // 右侧头像
                     Image(
                         painter = painterResource(id = R.drawable.girl_avatar),
                         contentDescription = "头像",
@@ -219,15 +219,13 @@ fun HomeScreen(
                             
                             Spacer(Modifier.weight(1f))
                             
-                            // 底部胶囊标签
                             Box(
                                 modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 4.dp)
                             ) {
                                 Text("本周 +$weekItemsCount", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
                         }
-                        // 背景透明杯子
-                        androidx.compose.foundation.Image(
+                        Image(
                             painter = painterResource(id = R.drawable.drink_milk_tea_cold),
                             contentDescription = null,
                             alpha = 0.05f,
@@ -240,7 +238,6 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // 本月已喝
                         Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
                             Column {
                                 Text("本月已喝", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
@@ -258,7 +255,6 @@ fun HomeScreen(
                         
                         Spacer(Modifier.height(12.dp))
                         
-                        // 本月花费
                         Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(16.dp)) {
                             Column {
                                 Text("本月花费", style = MaterialTheme.typography.titleSmall, color = PearlSoft, fontWeight = FontWeight.Medium)
@@ -270,19 +266,11 @@ fun HomeScreen(
                 }
             }
 
-            // 3. 原有快捷按钮
-            item {
-                QuickActions(
-                    onRecord = onRecord,
-                    onAiRecord = onAiRecord,
-                    onOpenWall = onOpenWall,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-                )
-            }
+            // ======== 👇 此处删除了原有的 QuickActions 卡片 👇 ========
 
             // 4. 最近喝过标题与过滤
             item {
-                Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "最近喝过",
@@ -382,53 +370,6 @@ private fun IconCircleButton(icon: @Composable () -> Unit, isActive: Boolean, on
 private fun FilterChipCustom(text: String, selected: Boolean, onClick: () -> Unit) {
     Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(if (selected) Color.Black else Color.Transparent).border(1.dp, if (selected) Color.Black else Color.LightGray, RoundedCornerShape(50)).clickable { onClick() }.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(text = text, style = MaterialTheme.typography.labelLarge, color = if (selected) Color.White else Color.Gray)
-    }
-}
-
-@Composable
-private fun QuickActions(onRecord: () -> Unit, onAiRecord: () -> Unit, onOpenWall: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        AiBanner(onClick = onAiRecord)
-        Spacer(Modifier.height(12.dp))
-        Row(modifier = Modifier.fillMaxWidth()) {
-            ActionTile(title = "手动记", subtitle = "自己填更准", emoji = "✍️", colors = listOf(Color(0xFFD39B6A), Color(0xFFE8C09E)), onClick = onRecord, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(12.dp))
-            ActionTile(title = "饮品墙", subtitle = "看看攒了多少", emoji = "🧱", colors = listOf(Color(0xFFB6A3F9), Color(0xFFD4C9FB)), onClick = onOpenWall, modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun AiBanner(onClick: () -> Unit) {
-    val transition = rememberInfiniteTransition(label = "ai")
-    val shift by transition.animateFloat(initialValue = -1f, targetValue = 2f, animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Restart), label = "aiShift")
-    BouncyBox(onClick = onClick) {
-        Box(modifier = Modifier.fillMaxWidth().shadow(14.dp, RoundedCornerShape(24.dp), ambientColor = Color(0xFF6C5CE7).copy(alpha = 0.4f), spotColor = Color(0xFF6C5CE7).copy(alpha = 0.4f)).clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(listOf(Color(0xFF7B6BF0), Color(0xFFA594F9))))) {
-            Box(modifier = Modifier.matchParentSize().background(Brush.linearGradient(colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.22f), Color.Transparent), start = Offset(shift * 600f - 300f, 0f), end = Offset(shift * 600f, 400f))))
-            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) { Text(text = "🤖", fontSize = 24.sp) }
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "AI 识图 · 拍一下就好", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                    Text(text = "小票 / 杯身 / 订单截图，自动填好", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.86f))
-                }
-                Text(text = "→", fontSize = 22.sp, color = Color.White, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActionTile(title: String, subtitle: String, emoji: String, colors: List<Color>, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    BouncyBox(onClick = onClick, modifier = modifier) {
-        Box(modifier = Modifier.fillMaxWidth().shadow(12.dp, RoundedCornerShape(24.dp), ambientColor = colors.first().copy(alpha = 0.4f), spotColor = colors.first().copy(alpha = 0.4f)).clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(colors)).padding(horizontal = 16.dp, vertical = 20.dp)) {
-            Column {
-                Text(text = emoji, fontSize = 24.sp)
-                Spacer(Modifier.height(12.dp))
-                Text(text = title, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(text = subtitle, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f))
-            }
-        }
     }
 }
 
