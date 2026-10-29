@@ -10,7 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,12 +24,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -54,6 +54,7 @@ import com.naicha.diary.ui.components.*
 import com.naicha.diary.ui.theme.*
 import com.naicha.diary.util.PhotoStore
 import com.naicha.diary.util.TimeUtil
+import kotlinx.coroutines.launch // 👈 补上了这个
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -221,14 +222,13 @@ private fun WallTabContent(items: List<Drink>, nodes: SnapshotStateList<StickerN
     }
 }
 
-// ================= 核心碰撞检测与网格平铺 =================
 @Composable
 private fun DraggableStickerWall(allItems: List<Drink>, nodes: SnapshotStateList<StickerNode>) {
     val targetItems = remember(allItems) { allItems.take(8) }
     if (targetItems.isEmpty()) return
 
     val cardSize = 64.dp
-    val wallHeight = 240.dp // 稍微增加高度，留出碰撞空间
+    val wallHeight = 240.dp
     val density = LocalDensity.current
 
     BoxWithConstraints(
@@ -244,7 +244,7 @@ private fun DraggableStickerWall(allItems: List<Drink>, nodes: SnapshotStateList
             val newItems = targetItems.filter { it.id !in currentIds }
 
             if (newItems.isNotEmpty()) {
-                val cols = 4 // 4列3行，足够放下8个且不拥挤
+                val cols = 4
                 val rows = 3
                 val padding = with(density) { 8.dp.toPx() }
                 val availableW = maxWidthPx - 2 * padding - cardSizePx
@@ -252,7 +252,6 @@ private fun DraggableStickerWall(allItems: List<Drink>, nodes: SnapshotStateList
                 val cellW = availableW / (cols - 1)
                 val cellH = availableH / (rows - 1)
 
-                // 记录已被占用的格子
                 val occupiedCells = nodes.map { 
                     val cx = ((it.offsetX - padding) / cellW).roundToInt().coerceIn(0, cols - 1)
                     val cy = ((it.offsetY - padding) / cellH).roundToInt().coerceIn(0, rows - 1)
@@ -265,7 +264,6 @@ private fun DraggableStickerWall(allItems: List<Drink>, nodes: SnapshotStateList
                     var col = 0
                     var row = 0
                     var found = false
-                    // 寻找一个没被占用的格子
                     for (r in 0 until rows) {
                         for (c in 0 until cols) {
                             if (!occupiedCells.contains(c to r)) {
@@ -284,7 +282,6 @@ private fun DraggableStickerWall(allItems: List<Drink>, nodes: SnapshotStateList
                         occupiedCells.add(col to row)
                     }
 
-                    // 小幅度抖动
                     val jitterX = (random.nextFloat() - 0.5f) * cellW * 0.3f
                     val jitterY = (random.nextFloat() - 0.5f) * cellH * 0.3f
 
@@ -320,11 +317,9 @@ private fun DraggableStickerItem(
     maxX: Float,
     maxY: Float
 ) {
-    // 使用 Animatable 控制视觉位置，解决瞬移
     val animX = remember { Animatable(if (node.hasAnimated) node.offsetX else -300f) }
     val animY = remember { Animatable(if (node.hasAnimated) node.offsetY else -300f) }
 
-    // 监听位置变化：如果是松手弹开导致的位置变化，应用弹簧动画
     LaunchedEffect(node.offsetX, node.offsetY) {
         if (node.hasAnimated && !node.isDragging) {
             launch { animX.animateTo(node.offsetX, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
@@ -332,7 +327,6 @@ private fun DraggableStickerItem(
         }
     }
 
-    // 初始掉落动画
     LaunchedEffect(Unit) {
         if (!node.hasAnimated) {
             kotlinx.coroutines.delay(index * 120L)
@@ -359,7 +353,6 @@ private fun DraggableStickerItem(
                     onDragStart = { node.isDragging = true },
                     onDragEnd = { 
                         node.isDragging = false
-                        // 👇 松手时计算新位置并进行碰撞避让
                         var targetX = (node.offsetX + dragOffsetX).coerceIn(0f, maxX)
                         var targetY = (node.offsetY + dragOffsetY).coerceIn(0f, maxY)
                         
@@ -368,10 +361,8 @@ private fun DraggableStickerItem(
                             var collided = false
                             for (other in allNodes) {
                                 if (other.tea.id == node.tea.id) continue
-                                // 如果小于卡片尺寸，说明重叠了（留一点点余量）
                                 if (abs(targetX - other.offsetX) < cardSizePx * 0.8f && abs(targetY - other.offsetY) < cardSizePx * 0.8f) {
                                     collided = true
-                                    // 沿 X 或 Y 轴推开
                                     val dx = targetX - other.offsetX
                                     val dy = targetY - other.offsetY
                                     if (abs(dx) > abs(dy)) {
@@ -403,8 +394,6 @@ private fun DraggableStickerItem(
         StickerImage(tea = node.tea, modifier = Modifier.fillMaxSize())
     }
 }
-
-// ================= 以下为保留的日历、列表等代码 =================
 
 @Composable
 private fun CalendarCard(
