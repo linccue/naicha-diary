@@ -67,11 +67,9 @@ fun HomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var activeQuickFilter by remember { mutableStateOf<String?>(null) }
 
-    // 控制成就弹窗
     var showAchievements by remember { mutableStateOf(false) }
     val achievementSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // 读取不喝打卡状态
     val prefs = remember { context.getSharedPreferences("abstinence_prefs", android.content.Context.MODE_PRIVATE) }
     val isTracking = prefs.getBoolean("is_tracking", false)
     val targetDays = prefs.getInt("target_days", 7)
@@ -88,7 +86,6 @@ fun HomeScreen(
     }
     val validStreak = if (drankDays.contains(todayDiff)) 0 else todayDiff - drankDays.count { it < todayDiff }
 
-    // 数据统计
     val totalCount = items.size
     val monthItems = remember(items) {
         val cal = Calendar.getInstance()
@@ -102,7 +99,6 @@ fun HomeScreen(
     val monthCount = monthItems.size
     val monthSpend = monthItems.sumOf { it.price }
     
-    // 计算本周记录
     val weekItemsCount = remember(items) {
         val cal = Calendar.getInstance()
         cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
@@ -112,11 +108,9 @@ fun HomeScreen(
 
     val processedItems = remember(items, selectedCategory, sortOrder, searchQuery, activeQuickFilter) {
         var result = items
-
         if (selectedCategory != "全部") {
             result = result.filter { it.category == selectedCategory }
         }
-
         if (searchQuery.isNotBlank()) {
             val q = searchQuery.trim()
             result = result.filter {
@@ -125,7 +119,6 @@ fun HomeScreen(
                 it.toppings.any { t -> t.contains(q, ignoreCase = true) }
             }
         }
-
         when (activeQuickFilter) {
             "无限复购" -> {
                 val counts = items.groupingBy { it.brand + it.name }.eachCount()
@@ -140,13 +133,11 @@ fun HomeScreen(
                 result = result.filter { it.timestamp >= cal.timeInMillis }
             }
         }
-
         result = when (sortOrder) {
             "评分由高到低" -> result.sortedByDescending { it.rating }
             "时间顺序" -> result.sortedByDescending { it.timestamp }
             else -> result.reversed()
         }
-
         result.take(30)
     }
 
@@ -161,13 +152,9 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 132.dp),
         ) {
-            // 1. 顶部打卡状态栏
             item {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 22.dp, vertical = 16.dp),
+                    modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 22.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -185,7 +172,6 @@ fun HomeScreen(
                             color = Color.Black
                         )
                     }
-                    // 👇 右侧头像点击，触发独立弹窗
                     Box(modifier = Modifier.clip(CircleShape).clickable { showAchievements = true }) {
                         Image(
                             painter = painterResource(id = R.drawable.girl_avatar),
@@ -196,13 +182,11 @@ fun HomeScreen(
                 }
             }
 
-            // 2. 三块数据统计卡片
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(172.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 左侧大卡片：本月已喝
                     Box(
                         modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 14.dp)
                     ) {
@@ -215,12 +199,10 @@ fun HomeScreen(
                                 Text(text = "杯", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(bottom = 6.dp))
                             }
                             Spacer(Modifier.weight(1f))
-                            // 底部灰色胶囊标签
                             Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 5.dp)) {
                                 Text(text = "总记录数量：$totalCount", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
                         }
-                        // 背景透明杯子水印
                         Image(
                             painter = painterResource(id = R.drawable.drink_milk_tea_cold),
                             contentDescription = null,
@@ -229,12 +211,10 @@ fun HomeScreen(
                         )
                     }
 
-                    // 右侧上下卡片
                     Column(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // 右侧上：本月花费
                         Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 12.dp)) {
                             Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
                                 Text(text = "本月花费", fontSize = 13.sp, color = Color(0xFF888888), fontWeight = FontWeight.Medium)
@@ -244,7 +224,6 @@ fun HomeScreen(
                         
                         Spacer(Modifier.height(12.dp))
                         
-                        // 右侧下：平均花费
                         Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 12.dp)) {
                             Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
                                 Text(text = "平均花费", fontSize = 13.sp, color = Color(0xFF888888), fontWeight = FontWeight.Medium)
@@ -255,7 +234,6 @@ fun HomeScreen(
                 }
             }
 
-            // 3. 最近喝过标题与过滤
             item {
                 Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -317,7 +295,6 @@ fun HomeScreen(
                 }
             }
 
-            // 4. 列表
             if (processedItems.isEmpty()) {
                 item { EmptyHint(onRecord = onRecord) }
             } else {
@@ -327,7 +304,6 @@ fun HomeScreen(
             }
         }
         
-        // 👇 独立二级窗口：点击头像弹出的成就勋章
         if (showAchievements) {
             ModalBottomSheet(
                 onDismissRequest = { showAchievements = false },
@@ -350,16 +326,15 @@ fun HomeScreen(
                     SoftCard {
                         SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
                         Spacer(Modifier.height(14.dp))
+                        // 这里只调用一次
                         Achievements(items = items, streak = currentStreak(items))
                     }
-                    Spacer(Modifier.height(40.dp)) // 底部留白，防遮挡
+                    Spacer(Modifier.height(40.dp))
                 }
             }
         }
     }
 }
-
-// ================= 辅助组件与函数 =================
 
 @Composable
 private fun IconCircleButton(icon: @Composable () -> Unit, isActive: Boolean, onClick: () -> Unit) {
@@ -459,7 +434,7 @@ private fun EmptyHint(onRecord: () -> Unit) {
     }
 }
 
-// 成就勋章组件
+// 成就勋章组件（只保留这一个）
 @Composable
 private fun Achievements(items: List<Drink>, streak: Int) {
     val brandCount = items.map { it.brand }.distinct().size
@@ -502,7 +477,7 @@ private fun Achievements(items: List<Drink>, streak: Int) {
     }
 }
 
-// 连续天数计算
+// 连续天数计算（只保留这一个）
 private fun currentStreak(items: List<Drink>): Int {
     if (items.isEmpty()) return 0
     val days = items.map { TimeUtil.startOfDay(it.timestamp) }.toHashSet()
