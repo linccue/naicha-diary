@@ -131,7 +131,7 @@ fun BrandManagerDialog(
         while (true) {
             val speed = autoScrollSpeed
             if (speed != 0f && draggingIndex != null) {
-                val consumed = gridState.scrollBy(speed)
+                                val consumed = gridState.dispatchRawDelta(speed)
                 if (consumed != 0f) {
                     // 补偿网格滚动导致的 item 位置变化，让被拖 item 保持跟手
                     dragOffset += Offset(0f, consumed)
