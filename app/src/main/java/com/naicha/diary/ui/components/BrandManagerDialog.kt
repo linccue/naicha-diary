@@ -61,7 +61,7 @@ import java.io.FileOutputStream
 import java.util.UUID
 import kotlin.math.min
 
-// ===== 品牌顺序持久化（key 名称与 RecordSheet.kt 必须一致）=====
+// ===== 品牌顺序持久化（key 必须与 RecordSheet.kt 一致）=====
 private const val ORDER_PREFS_NAME = "naicha_brand_order_prefs"
 private const val ORDER_KEY = "brand_order"
 private const val ORDER_SEPARATOR = "\u0001"
@@ -95,20 +95,26 @@ fun BrandManagerDialog(
     val customBrands by BrandStore.customBrands.collectAsState()
     val hiddenBrands by BrandStore.hiddenBrands.collectAsState()
 
-    val allBrands = remember(customBrands) { Catalog.brands + customBrands }
+    val allBrands: List<Brand> = remember(customBrands) { Catalog.brands + customBrands }
 
-    // 品牌顺序（持久化）
-    var savedOrder by remember { mutableStateOf(loadSavedBrandOrder(context)) }
-    val orderedAllBrands = remember(allBrands, savedOrder) {
+    // ===== 持久化的品牌顺序 =====
+    var savedOrder: List<String> by remember { mutableStateOf(loadSavedBrandOrder(context)) }
+
+    val orderedAllBrands: List<Brand> = remember(allBrands, savedOrder) {
         if (savedOrder.isEmpty()) {
             allBrands
         } else {
-            val map = allBrands.associateBy { it.name }
-            val result = savedOrder.mapNotNull { map[it] }.toMutableList()
+            val map = allBrands.associateBy { brand -> brand.name }
+            val result = ArrayList<Brand>(savedOrder.size)
+            savedOrder.forEach { name -> map[name]?.let { result.add(it) } }
             allBrands.forEach { b -> if (result.none { it.name == b.name }) result.add(b) }
             result
         }
     }
+
+    // ===== 拖拽时拿最新值的桥接（用 by 委托，避免 .value 被错误解析）=====
+    val currentOrder: List<Brand> by rememberUpdatedState(orderedAllBrands)
+    val currentSaved: List<String> by rememberUpdatedState(savedOrder)
 
     var selectedBrands by remember { mutableStateOf(setOf<String>()) }
     var showMenu by remember { mutableStateOf(false) }
@@ -120,8 +126,6 @@ fun BrandManagerDialog(
     val gridState = rememberLazyGridState()
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-    val orderedBrandsState by rememberUpdatedState(orderedAllBrands)
-    val savedOrderState by rememberUpdatedState(savedOrder)
 
     // 裁剪状态
     var cropUri by remember { mutableStateOf<Uri?>(null) }
@@ -329,15 +333,20 @@ fun BrandManagerDialog(
                                     showMenu = false
                                 })
                                 DropdownMenuItem(text = { Text("显示全部") }, onClick = {
-                                    BrandStore.toggleHide(context, allBrands.map { it.name }.toSet(), false)
+                                    BrandStore.toggleHide(context, allBrands.map { b -> b.name }.toSet(), false)
                                     showMenu = false
                                 })
                             }
                         }
                     }
 
-                    val filteredBrands = if (isSortMode) orderedAllBrands
-                    else orderedAllBrands.filter { searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true) }
+                    val filteredBrands: List<Brand> = if (isSortMode) {
+                        orderedAllBrands
+                    } else {
+                        orderedAllBrands.filter { brand ->
+                            searchQuery.isBlank() || brand.name.contains(searchQuery, ignoreCase = true)
+                        }
+                    }
 
                     LazyVerticalGrid(
                         state = gridState,
@@ -360,24 +369,33 @@ fun BrandManagerDialog(
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
-                                    val fromIndex = draggingIndex ?: return@detectDragGesturesAfterLongPress
+                                    val fromIndex: Int = draggingIndex ?: return@detectDragGesturesAfterLongPress
                                     dragOffset += dragAmount
+
                                     val currentItem = gridState.layoutInfo.visibleItemsInfo
-                                        .firstOrNull { it.index == fromIndex } ?: return@detectDragGesturesAfterLongPress
+                                        .firstOrNull { info -> info.index == fromIndex }
+                                        ?: return@detectDragGesturesAfterLongPress
+
                                     val centerX = currentItem.offset.x + currentItem.size.width / 2f + dragOffset.x
                                     val centerY = currentItem.offset.y + currentItem.size.height / 2f + dragOffset.y
+
                                     val targetItem = gridState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
                                         info.index != fromIndex &&
                                         centerX in info.offset.x.toFloat()..(info.offset.x + info.size.width).toFloat() &&
                                         centerY in info.offset.y.toFloat()..(info.offset.y + info.size.height).toFloat()
                                     } ?: return@detectDragGesturesAfterLongPress
-                                    val toIndex = targetItem.index
-                                    val newList = orderedBrandsState.value.toMutableList()
+
+                                    val toIndex: Int = targetItem.index
+                                    // ★ 用显式 ArrayList<Brand> 构造，避免 toMutableList() 的类型推断问题
+                                    val newList: ArrayList<Brand> = ArrayList<Brand>(currentOrder)
                                     if (fromIndex in newList.indices && toIndex in newList.indices) {
-                                        val moved = newList.removeAt(fromIndex)
+                                        val moved: Brand = newList.removeAt(fromIndex)
                                         newList.add(toIndex, moved)
-                                        savedOrder = newList.map { it.name }
+                                        // 写内存状态，UI 立即响应
+                                        val newOrder: List<String> = newList.map { brand -> brand.name }
+                                        savedOrder = newOrder
                                         draggingIndex = toIndex
+                                        // 抵消位置跳变，视觉连续
                                         dragOffset -= Offset(
                                             (targetItem.offset.x - currentItem.offset.x).toFloat(),
                                             (targetItem.offset.y - currentItem.offset.y).toFloat()
@@ -387,17 +405,17 @@ fun BrandManagerDialog(
                                 onDragEnd = {
                                     draggingIndex = null
                                     dragOffset = Offset.Zero
-                                    saveBrandOrder(context, savedOrderState.value)
+                                    saveBrandOrder(context, currentSaved)
                                 },
                                 onDragCancel = {
                                     draggingIndex = null
                                     dragOffset = Offset.Zero
-                                    saveBrandOrder(context, savedOrderState.value)
+                                    saveBrandOrder(context, currentSaved)
                                 }
                             )
                         }
                     ) {
-                        itemsIndexed(filteredBrands, key = { _, brand -> brand.name }) { index, brand ->
+                        itemsIndexed(filteredBrands, key = { _, brand: Brand -> brand.name }) { index, brand ->
                             val isSelected = selectedBrands.contains(brand.name)
                             val isHidden = hiddenBrands.contains(brand.name)
                             val isDragging = index == draggingIndex
