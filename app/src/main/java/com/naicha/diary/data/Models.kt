@@ -204,4 +204,16 @@ object BrandStore {
         _hiddenBrands.value = current
         prefs?.edit()?.putString("hidden", current.joinToString(","))?.apply()
     }
+        fun deleteBrands(context: android.content.Context, names: Set<String>) {
+        // 1. 如果是自定义品牌，直接从列表中彻底移除
+        _customBrands.value = _customBrands.value.filterNot { names.contains(it.name) }
+        prefs?.edit()?.putString("custom", kotlinx.serialization.json.Json.encodeToString(_customBrands.value))?.apply()
+        
+        // 2. 如果是系统内置品牌（代码里写死的），将其设置为隐藏（变透明）
+        val catalogNames = Catalog.brands.map { it.name }.toSet()
+        val toHide = names.intersect(catalogNames)
+        if (toHide.isNotEmpty()) {
+            toggleHide(context, toHide, true)
+        }
+    }
 }
