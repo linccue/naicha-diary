@@ -208,7 +208,13 @@ object BrandStore {
             _hiddenBrands.value = hiddenStr.split(",").toSet()
         }
     }
-
+  fun reload(context: android.content.Context) {
+        prefs = null
+        init(context)
+        // 同时更新排序
+        val orderPrefs = context.getSharedPreferences("naicha_brand_order_prefs", android.content.Context.MODE_PRIVATE)
+        // 此处仅作触发，具体在还原时重新读取即可
+    }
     fun addBrand(context: android.content.Context, brand: Brand) {
         _customBrands.value = _customBrands.value + brand
         Catalog.extraBrands = _customBrands.value // 👈 同步给 Catalog
