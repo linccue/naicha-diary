@@ -77,7 +77,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                 item {
                     StatsCard {
                         SectionHeader(title = "品类分布", subtitle = "喝了些什么")
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(12.dp))
                         CategoryDistribution(items = items)
                     }
                 }
@@ -89,7 +89,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                             Catalog.brands.take(20).count { unlocked.contains(it.name) }
                         }
                         SectionHeader(title = "品牌墙点亮", subtitle = "已点亮 $unlockedCount/20 个品牌")
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(12.dp))
                         BrandWall(items = items)
                     }
                 }
@@ -121,7 +121,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     }
 }
 
-// ================= 紧凑型品类分布 =================
+// ================= 极致紧凑的品类分布 =================
 @Composable
 private fun CategoryDistribution(items: List<Drink>) {
     val categoryData = remember(items) {
@@ -131,10 +131,10 @@ private fun CategoryDistribution(items: List<Drink>) {
     val palette = listOf(Caramel, Taro, Matcha, Strawberry, Sky, Color(0xFFF2B04A), Color(0xFFB08968), Color(0xFF95A5A6), Color(0xFF8E44AD))
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        // 高度从 180dp 缩小到 140dp，让卡片更矮
-        Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
+        // 高度进一步缩小到 110dp
+        Box(modifier = Modifier.size(110.dp), contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val stroke = size.minDimension * 0.16f // 环粗
+                val stroke = size.minDimension * 0.16f
                 val inset = stroke / 2f
                 var startAngle = -90f
 
@@ -164,13 +164,13 @@ private fun CategoryDistribution(items: List<Drink>) {
                     }
                 }
             }
-            Text("${total}杯", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.Black)
+            Text("${total}杯", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.Black)
         }
         
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
         
-        // 图例胶囊变窄、变薄
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        // 图例再缩窄，减少高度占比
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
             categoryData.chunked(2).forEach { rowItems ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     rowItems.forEachIndexed { index, entry ->
@@ -182,16 +182,16 @@ private fun CategoryDistribution(items: List<Drink>) {
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(Color(0xFFF8F9FA))
-                                .padding(horizontal = 12.dp, vertical = 8.dp), // 内边距缩减
+                                .padding(horizontal = 10.dp, vertical = 6.dp), // 从 8dp 减到 6dp
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
-                                Spacer(Modifier.width(6.dp))
+                                Spacer(Modifier.width(4.dp))
                                 Text(entry.first.label, style = MaterialTheme.typography.labelMedium, color = Color.Gray)
                             }
-                            Text("${percent}%", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.Black)
+                            Text("${percent}%", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.Black)
                         }
                     }
                     if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
@@ -201,14 +201,14 @@ private fun CategoryDistribution(items: List<Drink>) {
     }
 }
 
-// ================= 紧凑型品牌墙点亮 =================
+// ================= 极致紧凑的品牌墙点亮 =================
 @Composable
 private fun BrandWall(items: List<Drink>) {
     val unlockedBrands = remember(items) { items.map { it.brand }.toSet() }
     val displayBrands = remember { Catalog.brands.take(20) }
     
-    // 将行间距和图标尺寸都缩小，让卡片高度缩减一半
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+    // 圆点从 36dp 缩小到 32dp，行间距减到 6dp
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         displayBrands.chunked(5).forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 row.forEach { brand ->
@@ -217,26 +217,26 @@ private fun BrandWall(items: List<Drink>) {
                         BrandBadge(
                             badge = brand.badge,
                             color = Color(brand.color),
-                            size = 36.dp, // 图标缩小
+                            size = 32.dp,
                             logo = brand.logo,
                             squircle = Catalog.isSquircle(brand.name)
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(Color(0xFFE5E7EB))
                         )
                     }
                 }
-                repeat(5 - row.size) { Spacer(modifier = Modifier.size(36.dp)) }
+                repeat(5 - row.size) { Spacer(modifier = Modifier.size(32.dp)) }
             }
         }
     }
 }
 
-// ================= 其他保留组件 =================
+// ================= 保留组件 =================
 @Composable
 fun StatPill(label: String, value: String, accent: Color, modifier: Modifier = Modifier) {
     Column(
@@ -260,7 +260,8 @@ fun StatPill(label: String, value: String, accent: Color, modifier: Modifier = M
 @Composable
 fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(20.dp),
+        // 稍微减小了上下 padding，从 20.dp 减到 16.dp
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 20.dp, vertical = 16.dp),
         content = content
     )
 }
