@@ -249,7 +249,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         Text("云端同步 (WebDAV)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(8.dp))
         
-        OutlinedTextField(
+              OutlinedTextField(
             value = url,
             onValueChange = { url = it.trim(); prefs.edit().putString("url", url).apply() },
             placeholder = { Text("WebDAV 地址 (如 https://dav.jianguoyun.com/dav/)", color = Outline) },
@@ -280,6 +280,21 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                 modifier = Modifier.weight(1f),
             )
         }
+        
+        // 👇 新增一个明确的保存按钮
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SmallButton(text = "💾 保存 WebDAV 配置") {
+                haptics.confirm()
+                prefs.edit()
+                    .putString("url", url)
+                    .putString("user", user)
+                    .putString("pass", pass)
+                    .apply()
+                statusMsg = "✅ WebDAV 配置已保存"
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
