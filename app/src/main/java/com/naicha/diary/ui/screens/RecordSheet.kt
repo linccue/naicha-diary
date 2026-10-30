@@ -266,16 +266,23 @@ fun RecordSheet(
                                     )
                                 }
                                 // 👇 缩小后的加号按钮
+                                                               // 👇 修改后的加号按钮
                                 Box(
                                     modifier = Modifier
-                                        .width(62.dp) // 和 BrandChip 一样宽
-                                        .height(66.dp) // 和 BrandChip 一样高
+                                        .width(62.dp)
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(Color(0xFFF0F0F0))
-                                        .clickable { showBrandManager = true },
+                                        .clickable { showBrandManager = true }
+                                        .padding(vertical = 6.dp)
+                                        .height(60.dp), // 👈 图标36 + 间距4 + 文字20 = 60dp
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Add, "添加品牌", tint = Color.Gray, modifier = Modifier.size(24.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Add, 
+                                        contentDescription = "添加品牌", 
+                                        tint = Color.Gray, 
+                                        modifier = Modifier.size(26.dp)
+                                    )
                                 }
                             }
                         }
