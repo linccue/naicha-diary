@@ -269,7 +269,7 @@ fun BrandManagerDialog(
                             )
                         } else {
                             Text(
-                                text = if (isSortMode) "拖拽排序（长按拖动）" else "管理品牌",
+                                text = if (isSortMode) "拖拽排序" else "管理品牌",
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
