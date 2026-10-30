@@ -124,14 +124,6 @@ fun SettingsContent(
                 }
             }
 
-            // === 成就勋章 ===
-            item {
-                SoftCard {
-                    SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
-                    Spacer(Modifier.height(14.dp))
-                    Achievements(items = items, streak = currentStreak(items))
-                }
-            }
 
             // === AI 识图 ===
             item {
@@ -421,47 +413,6 @@ private fun SettingsAboutCard() {
 
 // 👇 下面是补全的成就勋章和连续天数计算
 
-@Composable
-private fun Achievements(items: List<Drink>, streak: Int) {
-    val brandCount = items.map { it.brand }.distinct().size
-    val sugarCount = items.map { it.sugar }.distinct().size
-    val photoCount = items.count { it.photoPath != null }
-    val total = items.size
-    val badges = listOf(
-        Triple("🌱", "第一杯", total >= 1), Triple("🧋", "十杯达成", total >= 10),
-        Triple("🏅", "五十杯", total >= 50), Triple("👑", "百杯王者", total >= 100),
-        Triple("🔥", "连续三天", streak >= 3), Triple("⚡", "连续七天", streak >= 7),
-        Triple("🧭", "尝鲜达人", brandCount >= 5), Triple("🍬", "甜度全通", sugarCount >= 5),
-        Triple("📷", "拍照记录", photoCount >= 5),
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        badges.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { (emoji, label, unlocked) ->
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (unlocked) Caramel.copy(alpha = 0.15f) else Color(0xFFF4F5F0))
-                            .border(if (unlocked) 0.dp else 1.dp, Color(0xFFEEEEEE), RoundedCornerShape(16.dp))
-                            .padding(vertical = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = if (unlocked) emoji else "🔒", fontSize = 24.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (unlocked) Color.Black else Color(0xFFBBBBBB),
-                            fontWeight = if (unlocked) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
 
 
 
