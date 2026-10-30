@@ -31,16 +31,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.drawLayer // 👈 补上了这个
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,10 +50,11 @@ import com.naicha.diary.data.BrandStore
 import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.DrinkCategory
 import com.naicha.diary.ui.theme.Caramel
-import kotlinx.coroutines.launch // 👈 补上了协程
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import kotlin.math.min
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -65,7 +63,8 @@ fun BrandManagerDialog(
     onBrandSelected: (Brand) -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope() // 👈 获取协程作用域
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
     LaunchedEffect(Unit) { BrandStore.init(context) }
     
     val customBrands by BrandStore.customBrands.collectAsState()
@@ -85,10 +84,9 @@ fun BrandManagerDialog(
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isCircleCrop by remember { mutableStateOf(true) }
     
-    // 缩放、移动状态，以及捕获画面的 GraphicsLayer
+    // 缩放、移动状态
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    val graphicsLayer = rememberGraphicsLayer()
     
     val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
         scale = (scale * zoomChange).coerceIn(0.5f, 3f)
@@ -133,11 +131,6 @@ fun BrandManagerDialog(
                             modifier = Modifier
                                 .size(280.dp)
                                 .clip(if (isCircleCrop) CircleShape else RoundedCornerShape(16.dp))
-                                // 捕获画面到 graphicsLayer
-                                .drawWithContent {
-                                    graphicsLayer.record { this@drawWithContent.drawContent() }
-                                    drawLayer(graphicsLayer)
-                                }
                         ) {
                             Image(
                                 bitmap = originalBitmap!!.asImageBitmap(),
@@ -188,9 +181,9 @@ fun BrandManagerDialog(
             confirmButton = {
                 TextButton(onClick = {
                     if (newBrandName.isNotBlank()) {
-                        // 👇 放到协程里执行截图和保存
                         scope.launch {
-                            val finalBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                            val frameSizePx = with(density) { 280.dp.toPx() }
+                            val finalBitmap = cropImageToCenter(originalBitmap!!, scale, offset, frameSizePx)
                             
                             val file = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
                             FileOutputStream(file).use { finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
@@ -361,4 +354,25 @@ fun BrandManagerDialog(
             }
         }
     }
+}
+
+// 👇 纯数学裁剪工具函数，绝对不报错
+private fun cropImageToCenter(bitmap: Bitmap, scale: Float, offset: Offset, frameSizePx: Float): Bitmap {
+    val output = Bitmap.createBitmap(frameSizePx.toInt(), frameSizePx.toInt(), Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(output)
+    val ratio = min(frameSizePx / bitmap.width, frameSizePx / bitmap.height)
+    val baseWidth = bitmap.width * ratio
+    val baseHeight = bitmap.height * ratio
+    
+    canvas.save()
+    canvas.translate(frameSizePx / 2 + offset.x, frameSizePx / 2 + offset.y)
+    canvas.scale(scale, scale)
+    canvas.translate(-frameSizePx / 2, -frameSizePx / 2)
+    
+    val left = (frameSizePx - baseWidth) / 2
+    val top = (frameSizePx - baseHeight) / 2
+    val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+    canvas.drawBitmap(bitmap, null, android.graphics.RectF(left, top, left + baseWidth, top + baseHeight), paint)
+    canvas.restore()
+    return output
 }
