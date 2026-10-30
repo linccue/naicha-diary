@@ -158,9 +158,15 @@ object Catalog {
     )
 
     fun brandsOf(category: DrinkCategory): List<Brand> = brands
-    fun brandOf(name: String): Brand = brands.firstOrNull { it.name == name } ?: brands.last()
+    fun brandOf(name: String): Brand = 
+        brands.firstOrNull { it.name == name } 
+        ?: extraBrands.firstOrNull { it.name == name } 
+        ?: brands.last()
     fun colorOf(name: String): Long = brandOf(name).color
-    fun isSquircle(name: String): Boolean = name in setOf("喜茶", "奈雪的茶", "霸王茶姬", "陈文鼎", "煲珠公")
+        fun isSquircle(name: String): Boolean {
+        if (name in setOf("喜茶", "奈雪的茶", "霸王茶姬", "陈文鼎", "煲珠公")) return true
+        val custom = extraBrands.firstOrNull { it.name == name }
+        return custom?.let { !it.isCircle } ?: false
     fun sizesFor(category: DrinkCategory): List<String> = listOf("小杯", "中杯", "大杯", "超大杯")
     fun sugarOptions(category: DrinkCategory): List<String> = sugars
     fun iceOptions(category: DrinkCategory): List<String> = listOf("热饮", "常温", "去冰", "少冰", "正常冰")
@@ -171,11 +177,7 @@ object Catalog {
 }
 
 object BrandStore {
-    private var prefs: android.content.SharedPreferences? = null
-    private val _customBrands = MutableStateFlow<List<Brand>>(emptyList())
-    val customBrands: StateFlow<List<Brand>> = _customBrands.asStateFlow()
-    private val _hiddenBrands = MutableStateFlow<Set<String>>(emptySet())
-    val hiddenBrands: StateFlow<Set<String>> = _hiddenBrands.asStateFlow()
+    // ... 上面代码不动 ...
 
     fun init(context: android.content.Context) {
         if (prefs != null) return
@@ -184,7 +186,10 @@ object BrandStore {
         
         val customStr = prefs?.getString("custom", "") ?: ""
         if (customStr.isNotEmpty()) {
-            try { _customBrands.value = gson.decodeFromString(customStr) } catch (e: Exception) {}
+            try { 
+                _customBrands.value = gson.decodeFromString(customStr) 
+                Catalog.extraBrands = _customBrands.value // 👈 同步给 Catalog
+            } catch (e: Exception) {}
         }
         
         val hiddenStr = prefs?.getString("hidden", "") ?: ""
@@ -195,7 +200,20 @@ object BrandStore {
 
     fun addBrand(context: android.content.Context, brand: Brand) {
         _customBrands.value = _customBrands.value + brand
+        Catalog.extraBrands = _customBrands.value // 👈 同步给 Catalog
         prefs?.edit()?.putString("custom", kotlinx.serialization.json.Json.encodeToString(_customBrands.value))?.apply()
+    }
+
+    fun deleteBrands(context: android.content.Context, names: Set<String>) {
+        _customBrands.value = _customBrands.value.filterNot { names.contains(it.name) }
+        Catalog.extraBrands = _customBrands.value // 👈 同步给 Catalog
+        prefs?.edit()?.putString("custom", kotlinx.serialization.json.Json.encodeToString(_customBrands.value))?.apply()
+        
+        val catalogNames = Catalog.brands.map { it.name }.toSet()
+        val toHide = names.intersect(catalogNames)
+        if (toHide.isNotEmpty()) {
+            toggleHide(context, toHide, true)
+        }
     }
 
     fun toggleHide(context: android.content.Context, names: Set<String>, hide: Boolean) {
