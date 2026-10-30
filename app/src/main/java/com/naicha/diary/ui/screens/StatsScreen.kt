@@ -25,11 +25,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.Drink
 import com.naicha.diary.ui.components.*
 import com.naicha.diary.ui.theme.*
-import com.naicha.diary.util.TimeUtil
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -39,7 +37,6 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     val totalSpend = remember(items) { items.sumOf { it.price } }
     val totalCalories = remember(items) { items.sumOf { it.calories } }
     val avgPrice = if (total == 0) 0.0 else totalSpend / total
-    val streak = remember(items) { currentStreak(items) }
     val avgRating = if (total == 0) 0f else items.map { it.rating }.sum() / total
 
     Box(modifier.fillMaxSize()) {
@@ -61,7 +58,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatPill(label = "总杯数", value = total.toString(), accent = Caramel, modifier = Modifier.weight(1f))
                     StatPill(label = "总花费", value = "¥${formatMoney(totalSpend)}", accent = Taro, modifier = Modifier.weight(1f))
-                    StatPill(label = "连续天数", value = "$streak 天", accent = Matcha, modifier = Modifier.weight(1f))
+                    StatPill(label = "连续天数", value = "${currentStreak(items)} 天", accent = Matcha, modifier = Modifier.weight(1f))
                 }
             }
 
@@ -367,14 +364,4 @@ private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>
             }
         }
     }
-}
-
-fun currentStreak(items: List<Drink>): Int {
-    if (items.isEmpty()) return 0
-    val days = items.map { TimeUtil.startOfDay(it.timestamp) }.toHashSet()
-    var cursor = TimeUtil.startOfDay(System.currentTimeMillis())
-    if (!days.contains(cursor)) cursor -= 86_400_000L
-    var streak = 0
-    while (days.contains(cursor)) { streak++; cursor -= 86_400_000L }
-    return streak
 }
