@@ -247,6 +247,28 @@ fun RecordSheet(
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Catalog.brandsOf(category).forEach { item ->
                                     BrandChip(brand = item, selected = brand == item.name, onClick = { brand = item.name })
+                                     Box(
+        modifier = Modifier
+            .size(74.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xFFF0F0F0))
+            .clickable { showBrandManager = true },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(Icons.Default.Add, "添加品牌", tint = Color.Gray)
+    }
+}
+
+// 在 RecordSheet 的最后（底栏外）加上弹窗：
+if (showBrandManager) {
+    BrandManagerDialog(
+        onDismiss = { showBrandManager = false },
+        onBrandSelected = { brand ->
+            this.brand = brand.name
+            this.category = brand.category
+        }
+    )
+}
                                 }
                             }
                         }
