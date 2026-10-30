@@ -1,6 +1,5 @@
 package com.naicha.diary.ui.components
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -46,6 +45,7 @@ import com.naicha.diary.ui.theme.Caramel
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import kotlin.math.min
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -54,71 +54,56 @@ fun BrandManagerDialog(
     onBrandSelected: (Brand) -> Unit
 ) {
     val context = LocalContext.current
-    // 初始化 BrandStore
     LaunchedEffect(Unit) { BrandStore.init(context) }
     
     val customBrands by BrandStore.customBrands.collectAsState()
     val hiddenBrands by BrandStore.hiddenBrands.collectAsState()
-    
-    // 所有品牌合并
     val allBrands = remember(customBrands) { Catalog.brands + customBrands }
 
-    // 状态
     var selectedBrands by remember { mutableStateOf(setOf<String>()) }
     var showMenu by remember { mutableStateOf(false) }
 
-    // 选图和裁剪状态
-    var pickingImage by remember { mutableStateOf(false) }
+    // 裁剪状态
     var cropUri by remember { mutableStateOf<Uri?>(null) }
+    var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isCircleCrop by remember { mutableStateOf(true) }
-    var croppedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    
     var showNameInput by remember { mutableStateOf(false) }
     var newBrandName by remember { mutableStateOf("") }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             cropUri = uri
-            val options = BitmapFactory.Options().apply { inSampleSize = 2 }
             context.contentResolver.openInputStream(uri)?.use { 
-                croppedBitmap = BitmapFactory.decodeStream(it, null, options) 
+                originalBitmap = BitmapFactory.decodeStream(it)
             }
         }
     }
 
-    if (pickingImage) {
-        LaunchedEffect(Unit) {
-            imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            pickingImage = false
-        }
-    }
-
-    // === 1. 裁剪预览界面 ===
-    if (cropUri != null && croppedBitmap != null) {
+    // 1. 裁剪界面
+    if (cropUri != null && originalBitmap != null) {
         Dialog(onDismissRequest = { cropUri = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // 顶部栏
                     Row(
                         modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = { cropUri = null }) {
-                            Icon(Icons.Default.Close, "取消", tint = Color.White)
-                        }
+                        IconButton(onClick = { cropUri = null }) { Icon(Icons.Default.Close, "取消", tint = Color.White) }
                         Text("裁切图片", color = Color.White, fontSize = 18.sp)
-                        IconButton(onClick = { showNameInput = true }) {
-                            Icon(Icons.Default.Check, "确定", tint = Color.Green)
-                        }
+                        IconButton(onClick = { showNameInput = true }) { Icon(Icons.Default.Check, "确定", tint = Color.Green) }
                     }
 
-                    // 预览区域
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        val bmp = originalBitmap!!
+                        val side = min(bmp.width, bmp.height)
+                        val x = (bmp.width - side) / 2
+                        val y = (bmp.height - side) / 2
+                        val squareBmp = Bitmap.createBitmap(bmp, x, y, side, side)
+                        
                         Image(
-                            bitmap = croppedBitmap!!.asImageBitmap(),
+                            bitmap = squareBmp.asImageBitmap(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -127,11 +112,7 @@ fun BrandManagerDialog(
                         )
                     }
 
-                    // 底部切换形状
-                    Row(
-                        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp), horizontalArrangement = Arrangement.Center) {
                         Button(
                             onClick = { isCircleCrop = true },
                             colors = ButtonDefaults.buttonColors(containerColor = if (isCircleCrop) Caramel else Color.Gray)
@@ -147,8 +128,8 @@ fun BrandManagerDialog(
         }
     }
 
-    // === 2. 输入品牌名弹窗 ===
-    if (showNameInput) {
+    // 2. 输入名称弹窗
+    if (showNameInput && originalBitmap != null) {
         AlertDialog(
             onDismissRequest = { showNameInput = false },
             title = { Text("输入品牌名称") },
@@ -162,13 +143,19 @@ fun BrandManagerDialog(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (newBrandName.isNotBlank() && croppedBitmap != null) {
-                        // 保存图片到本地
+                    if (newBrandName.isNotBlank()) {
+                        val bmp = originalBitmap!!
+                        val side = min(bmp.width, bmp.height)
+                        val x = (bmp.width - side) / 2
+                        val y = (bmp.height - side) / 2
+                        val cropped = Bitmap.createBitmap(bmp, x, y, side, side)
+                        
                         val file = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
-                        FileOutputStream(file).use { croppedBitmap!!.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                        FileOutputStream(file).use { cropped.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                        
                         val newBrand = Brand(
                             name = newBrandName.trim(),
-                            category = DrinkCategory.Tea, // 默认放茶饮
+                            category = DrinkCategory.Tea,
                             color = 0xFFC98A5B,
                             badge = newBrandName.trim().take(1),
                             logoPath = file.absolutePath,
@@ -176,11 +163,10 @@ fun BrandManagerDialog(
                         )
                         BrandStore.addBrand(context, newBrand)
                         
-                        // 关闭所有状态
                         cropUri = null
                         showNameInput = false
                         newBrandName = ""
-                        onDismiss() // 关闭主弹窗
+                        onDismiss()
                     }
                 }) { Text("确认") }
             },
@@ -190,7 +176,7 @@ fun BrandManagerDialog(
         )
     }
 
-    // === 3. 主管理弹窗 ===
+    // 3. 主界面
     if (cropUri == null && !showNameInput) {
         Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Surface(
@@ -198,43 +184,28 @@ fun BrandManagerDialog(
                 color = Color(0xFFF4F5F0)
             ) {
                 Column {
-                    // 顶部工具栏
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "关闭") }
                         Text("管理品牌", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        
-                        // 加号（选图）
-                        IconButton(onClick = { pickingImage = true }) {
+                        IconButton(onClick = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
                             Icon(Icons.Default.Add, "添加品牌")
                         }
-                        
-                        // 三点菜单
                         Box {
                             IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "菜单") }
                             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("隐藏选中") },
-                                    onClick = {
-                                        BrandStore.toggleHide(context, selectedBrands, true)
-                                        selectedBrands = emptySet()
-                                        showMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("显示全部") },
-                                    onClick = {
-                                        BrandStore.toggleHide(context, allBrands.map { it.name }.toSet(), false)
-                                        showMenu = false
-                                    }
-                                )
+                                DropdownMenuItem(text = { Text("隐藏选中") }, onClick = {
+                                    BrandStore.toggleHide(context, selectedBrands, true)
+                                    selectedBrands = emptySet()
+                                    showMenu = false
+                                })
+                                DropdownMenuItem(text = { Text("显示全部") }, onClick = {
+                                    BrandStore.toggleHide(context, allBrands.map { it.name }.toSet(), false)
+                                    showMenu = false
+                                })
                             }
                         }
                     }
 
-                    // 品牌网格
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(4),
                         contentPadding = PaddingValues(16.dp),
