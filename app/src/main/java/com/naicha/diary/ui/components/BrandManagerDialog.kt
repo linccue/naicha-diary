@@ -55,13 +55,13 @@ import com.naicha.diary.data.BrandStore
 import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.DrinkCategory
 import com.naicha.diary.ui.theme.Caramel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 import kotlin.math.min
 
-// ===== 品牌顺序持久化（key 必须与 RecordSheet.kt 一致）=====
 private const val ORDER_PREFS_NAME = "naicha_brand_order_prefs"
 private const val ORDER_KEY = "brand_order"
 private const val ORDER_SEPARATOR = "\u0001"
@@ -79,7 +79,6 @@ private fun saveBrandOrder(context: Context, order: List<String>) {
         .putString(ORDER_KEY, order.joinToString(ORDER_SEPARATOR))
         .apply()
 }
-// ============================================================
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -97,7 +96,6 @@ fun BrandManagerDialog(
 
     val allBrands: List<Brand> = remember(customBrands) { Catalog.brands + customBrands }
 
-    // ===== 持久化的品牌顺序 =====
     var savedOrder: List<String> by remember { mutableStateOf(loadSavedBrandOrder(context)) }
 
     val orderedAllBrands: List<Brand> = remember(allBrands, savedOrder) {
@@ -112,7 +110,6 @@ fun BrandManagerDialog(
         }
     }
 
-    // ===== 拖拽时拿最新值的桥接（用 by 委托，避免 .value 被错误解析）=====
     val currentOrder: List<Brand> by rememberUpdatedState(orderedAllBrands)
     val currentSaved: List<String> by rememberUpdatedState(savedOrder)
 
@@ -121,13 +118,29 @@ fun BrandManagerDialog(
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // 拖拽状态
     var isSortMode by remember { mutableStateOf(false) }
     val gridState = rememberLazyGridState()
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    // ★ 边缘自动滚动速度（> 0 = 向下滚，< 0 = 向上滚，0 = 停止）
+    var autoScrollSpeed by remember { mutableStateOf(0f) }
 
-    // 裁剪状态
+    // ★ 拖拽中的边缘自动滚动协程（每 16ms 检查一次）
+    LaunchedEffect(isSortMode) {
+        if (!isSortMode) return@LaunchedEffect
+        while (true) {
+            val speed = autoScrollSpeed
+            if (speed != 0f && draggingIndex != null) {
+                val consumed = gridState.scrollBy(speed)
+                if (consumed != 0f) {
+                    // 补偿网格滚动导致的 item 位置变化，让被拖 item 保持跟手
+                    dragOffset += Offset(0f, consumed)
+                }
+            }
+            delay(16)
+        }
+    }
+
     var cropUri by remember { mutableStateOf<Uri?>(null) }
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isCircleCrop by remember { mutableStateOf(true) }
@@ -152,7 +165,6 @@ fun BrandManagerDialog(
         }
     }
 
-    // ================= 1. 裁剪预览 =================
     if (cropUri != null && originalBitmap != null) {
         Dialog(onDismissRequest = { cropUri = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
@@ -194,7 +206,6 @@ fun BrandManagerDialog(
         }
     }
 
-    // ================= 2. 输入品牌名 =================
     if (showNameInput) {
         AlertDialog(
             onDismissRequest = { showNameInput = false },
@@ -238,7 +249,6 @@ fun BrandManagerDialog(
         )
     }
 
-    // ================= 3. 主管理界面 =================
     if (cropUri == null && !showNameInput) {
         Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Surface(
@@ -246,7 +256,6 @@ fun BrandManagerDialog(
                 color = Color(0xFFF4F5F0)
             ) {
                 Column {
-                    // 工具栏
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -276,7 +285,6 @@ fun BrandManagerDialog(
                             )
                         }
 
-                        // 搜索
                         IconButton(onClick = {
                             showSearch = !showSearch
                             if (!showSearch) searchQuery = ""
@@ -285,12 +293,12 @@ fun BrandManagerDialog(
                             Icon(Icons.Default.Search, "搜索", tint = if (showSearch) Caramel else Color.Black)
                         }
 
-                        // ★ 排序按钮（搜索右边、加号左边）
                         IconButton(onClick = {
                             if (isSortMode) {
                                 isSortMode = false
                                 draggingIndex = null
                                 dragOffset = Offset.Zero
+                                autoScrollSpeed = 0f
                                 saveBrandOrder(context, savedOrder)
                             } else {
                                 isSortMode = true
@@ -305,7 +313,6 @@ fun BrandManagerDialog(
                             )
                         }
 
-                        // 加号
                         IconButton(onClick = {
                             if (!isSortMode) {
                                 imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -314,7 +321,6 @@ fun BrandManagerDialog(
                             Icon(Icons.Default.Add, "添加品牌", tint = if (isSortMode) Color.Gray else Color.Black)
                         }
 
-                        // 三点菜单
                         Box {
                             IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "菜单") }
                             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
@@ -365,6 +371,7 @@ fun BrandManagerDialog(
                                     if (item != null) {
                                         draggingIndex = item.index
                                         dragOffset = Offset.Zero
+                                        autoScrollSpeed = 0f
                                     }
                                 },
                                 onDrag = { change, dragAmount ->
@@ -379,6 +386,22 @@ fun BrandManagerDialog(
                                     val centerX = currentItem.offset.x + currentItem.size.width / 2f + dragOffset.x
                                     val centerY = currentItem.offset.y + currentItem.size.height / 2f + dragOffset.y
 
+                                    // ★ 边缘自动滚动检测
+                                    val gridHeight = size.height.toFloat()
+                                    val edgeZone = 80.dp.toPx()
+                                    val maxSpeed = 18f
+                                    autoScrollSpeed = when {
+                                        centerY < edgeZone -> {
+                                            val ratio = (1f - centerY / edgeZone).coerceIn(0f, 1f)
+                                            -maxSpeed * ratio
+                                        }
+                                        centerY > gridHeight - edgeZone -> {
+                                            val ratio = (1f - (gridHeight - centerY) / edgeZone).coerceIn(0f, 1f)
+                                            maxSpeed * ratio
+                                        }
+                                        else -> 0f
+                                    }
+
                                     val targetItem = gridState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
                                         info.index != fromIndex &&
                                         centerX in info.offset.x.toFloat()..(info.offset.x + info.size.width).toFloat() &&
@@ -386,16 +409,13 @@ fun BrandManagerDialog(
                                     } ?: return@detectDragGesturesAfterLongPress
 
                                     val toIndex: Int = targetItem.index
-                                    // ★ 用显式 ArrayList<Brand> 构造，避免 toMutableList() 的类型推断问题
                                     val newList: ArrayList<Brand> = ArrayList<Brand>(currentOrder)
                                     if (fromIndex in newList.indices && toIndex in newList.indices) {
                                         val moved: Brand = newList.removeAt(fromIndex)
                                         newList.add(toIndex, moved)
-                                        // 写内存状态，UI 立即响应
                                         val newOrder: List<String> = newList.map { brand -> brand.name }
                                         savedOrder = newOrder
                                         draggingIndex = toIndex
-                                        // 抵消位置跳变，视觉连续
                                         dragOffset -= Offset(
                                             (targetItem.offset.x - currentItem.offset.x).toFloat(),
                                             (targetItem.offset.y - currentItem.offset.y).toFloat()
@@ -405,11 +425,13 @@ fun BrandManagerDialog(
                                 onDragEnd = {
                                     draggingIndex = null
                                     dragOffset = Offset.Zero
+                                    autoScrollSpeed = 0f
                                     saveBrandOrder(context, currentSaved)
                                 },
                                 onDragCancel = {
                                     draggingIndex = null
                                     dragOffset = Offset.Zero
+                                    autoScrollSpeed = 0f
                                     saveBrandOrder(context, currentSaved)
                                 }
                             )
