@@ -9,7 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -37,6 +36,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawLayer // 👈 补上了这个
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -53,6 +53,7 @@ import com.naicha.diary.data.BrandStore
 import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.DrinkCategory
 import com.naicha.diary.ui.theme.Caramel
+import kotlinx.coroutines.launch // 👈 补上了协程
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
@@ -64,6 +65,7 @@ fun BrandManagerDialog(
     onBrandSelected: (Brand) -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope() // 👈 获取协程作用域
     LaunchedEffect(Unit) { BrandStore.init(context) }
     
     val customBrands by BrandStore.customBrands.collectAsState()
@@ -131,7 +133,7 @@ fun BrandManagerDialog(
                             modifier = Modifier
                                 .size(280.dp)
                                 .clip(if (isCircleCrop) CircleShape else RoundedCornerShape(16.dp))
-                                // 👇 将当前 Box 内的画面捕获到 graphicsLayer
+                                // 捕获画面到 graphicsLayer
                                 .drawWithContent {
                                     graphicsLayer.record { this@drawWithContent.drawContent() }
                                     drawLayer(graphicsLayer)
@@ -186,26 +188,28 @@ fun BrandManagerDialog(
             confirmButton = {
                 TextButton(onClick = {
                     if (newBrandName.isNotBlank()) {
-                        // 👇 直接截取预览框里的画面（所见即所得）
-                        val finalBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
-                        
-                        val file = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
-                        FileOutputStream(file).use { finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                        
-                        val newBrand = Brand(
-                            name = newBrandName.trim(),
-                            category = DrinkCategory.MilkTea,
-                            color = 0xFFC98A5B,
-                            badge = newBrandName.trim().take(1),
-                            logoPath = file.absolutePath,
-                            isCircle = isCircleCrop
-                        )
-                        BrandStore.addBrand(context, newBrand)
-                        
-                        cropUri = null
-                        showNameInput = false
-                        newBrandName = ""
-                        onDismiss()
+                        // 👇 放到协程里执行截图和保存
+                        scope.launch {
+                            val finalBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                            
+                            val file = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
+                            FileOutputStream(file).use { finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                            
+                            val newBrand = Brand(
+                                name = newBrandName.trim(),
+                                category = DrinkCategory.MilkTea,
+                                color = 0xFFC98A5B,
+                                badge = newBrandName.trim().take(1),
+                                logoPath = file.absolutePath,
+                                isCircle = isCircleCrop
+                            )
+                            BrandStore.addBrand(context, newBrand)
+                            
+                            cropUri = null
+                            showNameInput = false
+                            newBrandName = ""
+                            onDismiss()
+                        }
                     }
                 }) { Text("确认") }
             },
@@ -286,7 +290,7 @@ fun BrandManagerDialog(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("显示全部") }, // 👈 恢复显示全部
+                                    text = { Text("显示全部") }, 
                                     onClick = {
                                         BrandStore.toggleHide(context, allBrands.map { it.name }.toSet(), false)
                                         showMenu = false
@@ -309,12 +313,12 @@ fun BrandManagerDialog(
                     ) {
                         items(filteredBrands) { brand ->
                             val isSelected = selectedBrands.contains(brand.name)
-                            val isHidden = hiddenBrands.contains(brand.name) // 👈 判断是否隐藏
+                            val isHidden = hiddenBrands.contains(brand.name)
 
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
-                                    .alpha(if (isHidden) 0.3f else 1f) // 👈 隐藏的透明度变低
+                                    .alpha(if (isHidden) 0.3f else 1f) 
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(if (isSelected) Color.LightGray else Color.Transparent)
                                     .combinedClickable(
@@ -345,7 +349,7 @@ fun BrandManagerDialog(
                                 Text(
                                     text = brand.name,
                                     fontSize = 11.sp,
-                                    color = if (isHidden) Color.Gray else Color.Black, // 隐藏文字也变灰
+                                    color = if (isHidden) Color.Gray else Color.Black,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     textAlign = TextAlign.Center
