@@ -580,11 +580,25 @@ private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
 @Composable
 private fun BrandRank(items: List<Drink>) {
     val ranking = remember(items) {
-        items.groupBy { it.brand }.map { (brand, list) -> Triple(brand, list.size, list.sumOf { it.price }) }.sortedByDescending { it.second }
+        items.groupBy { it.brand }
+            .map { (brand, list) -> Triple(brand, list.size, list.sumOf { it.price }) }
+            .sortedByDescending { it.second }
     }
     val max = ranking.firstOrNull()?.second ?: 1
 
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 132.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            SoftCard {
+                SectionHeader(title = "品牌分布", subtitle = "喝得最多的那几家")
+                Spacer(Modifier.height(14.dp))
+                BrandDonut(items = items)
+            }
+        }
+
         items(ranking, key = { it.first }) { (brandName, count, spend) ->
             val brand = Catalog.brandOf(brandName)
             val color = Color(brand.color)
@@ -605,6 +619,42 @@ private fun BrandRank(items: List<Drink>) {
                         Spacer(Modifier.height(6.dp))
                         Text(text = "累计 ¥${formatMoney(spend)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrandDonut(items: List<Drink>) {
+    val data = remember(items) { items.groupingBy { it.brand }.eachCount().entries.sortedByDescending { it.value }.take(6) }
+    val total = data.sumOf { it.value }.coerceAtLeast(1)
+    val palette = listOf(Caramel, Taro, Matcha, Strawberry, Sky, Color(0xFFF2B04A))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(128.dp)) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val stroke = size.minDimension * 0.24f
+                val inset = stroke / 2f
+                var startAngle = -90f
+                data.forEachIndexed { index, entry ->
+                    val sweep = entry.value.toFloat() / total * 360f
+                    drawArc(color = palette[index % palette.size], startAngle = startAngle + 1.6f, sweepAngle = (sweep - 3.2f).coerceAtLeast(0.6f), useCenter = false, topLeft = Offset(inset, inset), size = Size(size.width - stroke, size.height - stroke), style = Stroke(width = stroke, cap = StrokeCap.Round))
+                    startAngle += sweep
+                }
+            }
+            Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = "$total", style = MaterialTheme.typography.headlineMedium, color = Caramel, fontWeight = FontWeight.Bold)
+                Text(text = "总杯数", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            data.forEachIndexed { index, entry ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(palette[index % palette.size]))
+                    Spacer(Modifier.width(7.dp))
+                    Text(text = entry.key, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f), maxLines = 1)
+                    Text(text = "${entry.value} 杯", style = MaterialTheme.typography.labelMedium, color = PearlSoft)
                 }
             }
         }
