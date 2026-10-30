@@ -234,10 +234,21 @@ fun BrandManagerDialog(
                                 logoPath = file.absolutePath,
                                 isCircle = isCircleCrop
                             )
-                            BrandStore.addBrand(context, newBrand)
-                            val newOrder = listOf(newBrand.name) + savedOrder.filter { it != newBrand.name }
-                            savedOrder = newOrder
-                            saveBrandOrder(context, newOrder)
+                                                        BrandStore.addBrand(context, newBrand)
+                            
+                            // 👇 新增：让新添加的品牌排在第四行第一个
+                            val currentNames = orderedAllBrands.map { it.name }.toMutableList()
+                            currentNames.remove(newBrand.name) // 防重复
+                            // 第四行第一个的索引是 15 (0-4第一行, 5-9第二行, 10-14第三行, 15是第四行第一个)
+                            val targetIndex = 15
+                            if (currentNames.size >= targetIndex) {
+                                currentNames.add(targetIndex, newBrand.name)
+                            } else {
+                                // 如果总数还不到第四行，就直接追加到末尾
+                                currentNames.add(newBrand.name)
+                            }
+                            savedOrder = currentNames
+                            saveBrandOrder(context, currentNames)
                             cropUri = null
                             showNameInput = false
                             newBrandName = ""
