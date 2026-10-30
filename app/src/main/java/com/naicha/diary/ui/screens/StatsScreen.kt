@@ -19,12 +19,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.Drink
 import com.naicha.diary.ui.components.*
 import com.naicha.diary.ui.theme.*
@@ -73,11 +73,21 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
             }
 
             if (total > 0) {
+                // 👇 新增：品类分布
                 item {
                     StatsCard {
-                        SectionHeader(title = "品牌分布", subtitle = "喝得最多的那几家")
-                        Spacer(Modifier.height(14.dp))
-                        BrandDonut(items = items)
+                        SectionHeader(title = "品类分布", subtitle = "喝了些什么")
+                        Spacer(Modifier.height(20.dp))
+                        CategoryDistribution(items = items)
+                    }
+                }
+
+                // 👇 新增：品牌墙点亮
+                item {
+                    StatsCard {
+                        SectionHeader(title = "品牌墙点亮", subtitle = "解锁你的品牌图鉴")
+                        Spacer(Modifier.height(20.dp))
+                        BrandWall(items = items)
                     }
                 }
 
@@ -108,6 +118,104 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     }
 }
 
+@Composable
+private fun CategoryDistribution(items: List<Drink>) {
+    val categoryData = remember(items) {
+        items.groupingBy { it.categoryType }.eachCount().toList().sortedByDescending { it.second }
+    }
+    val total = categoryData.sumOf { it.second }.coerceAtLeast(1)
+    val palette = listOf(Caramel, Taro, Matcha, Strawberry, Sky, Color(0xFFF2B04A), Color(0xFFB08968), Color(0xFF95A5A6), Color(0xFF8E44AD))
+
+    Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = size.minDimension * 0.18f
+            val inset = stroke / 2f
+            var startAngle = -90f
+            categoryData.forEachIndexed { index, entry ->
+                val sweep = entry.second.toFloat() / total * 360f
+                drawArc(
+                    color = palette[index % palette.size],
+                    startAngle = startAngle + 1.6f,
+                    sweepAngle = (sweep - 3.2f).coerceAtLeast(0.6f),
+                    useCenter = false,
+                    topLeft = Offset(inset, inset),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    style = Stroke(width = stroke, cap = StrokeCap.Butt)
+                )
+                startAngle += sweep
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("${total}杯", style = MaterialTheme.typography.headlineMedium, color = Color.Black, fontWeight = FontWeight.Bold)
+        }
+    }
+    
+    Spacer(Modifier.height(20.dp))
+    
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        categoryData.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                row.forEachIndexed { index, entry ->
+                    val actualIndex = categoryData.indexOf(entry)
+                    val color = palette[actualIndex % palette.size]
+                    val percent = (entry.second.toFloat() / total * 100).toInt()
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFF8F9FA))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(color))
+                            Spacer(Modifier.width(6.dp))
+                            Text(entry.first.label, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                        }
+                        Text("${percent}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
+                }
+                if (row.size < 2) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrandWall(items: List<Drink>) {
+    val unlockedBrands = remember(items) { items.map { it.brand }.toSet() }
+    val allBrands = Catalog.brands
+    
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        allBrands.chunked(5).forEach { row ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                row.forEach { brand ->
+                    val isUnlocked = unlockedBrands.contains(brand.name)
+                    if (isUnlocked) {
+                        BrandBadge(
+                            badge = brand.badge,
+                            color = Color(brand.color),
+                            size = 42.dp,
+                            logo = brand.logo,
+                            squircle = Catalog.isSquircle(brand.name)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE5E7EB))
+                        )
+                    }
+                }
+                repeat(5 - row.size) { Spacer(modifier = Modifier.size(42.dp)) }
+            }
+        }
+    }
+}
+
+// ================= 保留的卡片 =================
 @Composable
 fun StatPill(label: String, value: String, accent: Color, modifier: Modifier = Modifier) {
     Column(
@@ -312,42 +420,6 @@ private fun SpendingRankCard(items: List<Drink>) {
 }
 
 @Composable
-private fun BrandDonut(items: List<Drink>) {
-    val data = remember(items) { items.groupingBy { it.brand }.eachCount().entries.sortedByDescending { it.value }.take(6) }
-    val total = data.sumOf { it.value }.coerceAtLeast(1)
-    val palette = listOf(Caramel, Taro, Matcha, Strawberry, Sky, Color(0xFFF2B04A))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(128.dp)) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val stroke = size.minDimension * 0.24f
-                val inset = stroke / 2f
-                var startAngle = -90f
-                data.forEachIndexed { index, entry ->
-                    val sweep = entry.value.toFloat() / total * 360f
-                    drawArc(color = palette[index % palette.size], startAngle = startAngle + 1.6f, sweepAngle = (sweep - 3.2f).coerceAtLeast(0.6f), useCenter = false, topLeft = Offset(inset, inset), size = Size(size.width - stroke, size.height - stroke), style = Stroke(width = stroke, cap = StrokeCap.Round))
-                    startAngle += sweep
-                }
-            }
-            Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                AnimatedNumber(value = total, style = MaterialTheme.typography.headlineMedium, color = Caramel)
-                Text(text = "总杯数", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        Spacer(Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            data.forEachIndexed { index, entry ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(palette[index % palette.size]))
-                    Spacer(Modifier.width(7.dp))
-                    Text(text = entry.key, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f), maxLines = 1)
-                    Text(text = "${entry.value} 杯", style = MaterialTheme.typography.labelMedium, color = PearlSoft)
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>) {
     val max = entries.maxOfOrNull { it.second }?.coerceAtLeast(1) ?: 1
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -368,7 +440,6 @@ private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>
     }
 }
 
-// 👇 补全了 currentStreak，这样 StatsScreen 就能独立调用它了
 private fun currentStreak(items: List<Drink>): Int {
     if (items.isEmpty()) return 0
     val days = items.map { TimeUtil.startOfDay(it.timestamp) }.toHashSet()
