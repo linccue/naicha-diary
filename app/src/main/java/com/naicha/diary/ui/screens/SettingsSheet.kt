@@ -138,7 +138,14 @@ fun SettingsContent(
             item {
                 SettingsDataCard(items, onClearAll)
             }
-
+            // === 成就勋章 ===
+            item {
+                SoftCard {
+                    SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
+                    Spacer(Modifier.height(14.dp))
+                    Achievements(items = items, streak = currentStreak(items))
+                }
+            }
             // === 关于 ===
             item {
                 SettingsAboutCard()
