@@ -290,17 +290,21 @@ fun RecordSheet(
                                         onClick = { brand = item.name }
                                     )
                                 }
-                                Box(
+                                                               Box(
                                     modifier = Modifier
                                         .width(62.dp)
+                                        .height(66.dp) // 👈 与 BrandChip 完全一致的高度
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(Color(0xFFF0F0F0))
-                                        .clickable { showBrandManager = true }
-                                        .padding(vertical = 6.dp)
-                                        .height(60.dp),
+                                        .clickable { showBrandManager = true },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Add, "添加品牌", tint = Color.Gray, modifier = Modifier.size(26.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Add, 
+                                        contentDescription = "添加品牌", 
+                                        tint = Color.Gray, 
+                                        modifier = Modifier.size(28.dp)
+                                    )
                                 }
                             }
                         }
