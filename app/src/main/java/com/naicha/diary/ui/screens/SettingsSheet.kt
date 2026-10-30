@@ -1,18 +1,8 @@
 package com.naicha.diary.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import com.naicha.diary.data.DrinkRepository
-import com.naicha.diary.util.WebDavClient
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,11 +20,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.naicha.diary.DrinkApp
 import com.naicha.diary.data.AppSettings
 import com.naicha.diary.data.Drink
+import com.naicha.diary.data.DrinkRepository
 import com.naicha.diary.net.DeepSeekClient
 import com.naicha.diary.ui.components.AbstinenceTracker
 import com.naicha.diary.ui.components.GradientButton
@@ -46,8 +39,13 @@ import com.naicha.diary.ui.theme.Outline
 import com.naicha.diary.ui.theme.PearlSoft
 import com.naicha.diary.ui.theme.Strawberry
 import com.naicha.diary.ui.theme.Taro
+import com.naicha.diary.util.TimeUtil
+import com.naicha.diary.util.WebDavClient
 import com.naicha.diary.util.rememberHaptics
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,9 +108,6 @@ fun SettingsContent(
                     onOpenSettings = { showDetail = true } // 点击齿轮进入第二层
                 )
             }
-            
-            // 如果你在第一层想放点别的东西，可以放这
-
         } else {
             // ================= 第二层：设置详情页 =================
             item {
@@ -129,6 +124,15 @@ fun SettingsContent(
                 }
             }
 
+            // === 成就勋章 ===
+            item {
+                SoftCard {
+                    SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
+                    Spacer(Modifier.height(14.dp))
+                    Achievements(items = items, streak = currentStreak(items))
+                }
+            }
+
             // === AI 识图 ===
             item {
                 SettingsAiCard()
@@ -138,14 +142,7 @@ fun SettingsContent(
             item {
                 SettingsDataCard(items, onClearAll)
             }
-            // === 成就勋章 ===
-            item {
-                SoftCard {
-                    SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
-                    Spacer(Modifier.height(14.dp))
-                    Achievements(items = items, streak = currentStreak(items))
-                }
-            }
+            
             // === 关于 ===
             item {
                 SettingsAboutCard()
@@ -154,7 +151,7 @@ fun SettingsContent(
     }
 }
 
-// ============== 下面是拆分出的卡片组件，保持原本逻辑 ==============
+// ============== 下面是拆分出的卡片组件 ==============
 
 @Composable
 private fun SettingsAiCard() {
@@ -236,10 +233,8 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
     
-    // 清空数据状态
     var confirmClear by remember { mutableStateOf(false) }
     
-    // WebDAV 状态
     val prefs = remember { context.getSharedPreferences("webdav_prefs", android.content.Context.MODE_PRIVATE) }
     var url by remember { mutableStateOf(prefs.getString("url", "") ?: "") }
     var user by remember { mutableStateOf(prefs.getString("user", "") ?: "") }
@@ -251,7 +246,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         SectionHeader(title = "我的数据", subtitle = "全部存在本机")
         Spacer(Modifier.height(12.dp))
         
-        // === 数据统计 ===
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatBox("记录", "${items.size}", Caramel, Modifier.weight(1f))
             StatBox("照片", "${items.count { it.photoPath != null }}", Taro, Modifier.weight(1f))
@@ -260,13 +254,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         
         Spacer(Modifier.height(16.dp))
         
-        // === WebDAV 云端同步 ===
-        Text(
-            text = "云端同步 (WebDAV)",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Text("云端同步 (WebDAV)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(8.dp))
         
         OutlinedTextField(
@@ -303,7 +291,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            // 备份按钮
             Box(modifier = Modifier.weight(1f)) {
                 GradientButton(
                     text = if (isWorking) "处理中…" else "立即备份",
@@ -340,7 +327,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                 )
             }
             
-            // 还原按钮
             Box(modifier = Modifier.weight(1f)) {
                 GradientButton(
                     text = if (isWorking) "处理中…" else "从云端还原",
@@ -361,8 +347,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                             val jsonStr = res.getOrThrow()
                                             val json = Json { ignoreUnknownKeys = true }
                                             val restoredList = json.decodeFromString<List<Drink>>(jsonStr)
-                                            
-                                            // 覆盖本地数据
                                             DrinkRepository(context).replaceAll(restoredList)
                                             statusMsg = "✅ 还原成功！请重新打开 App 查看"
                                             haptics.confirm()
@@ -384,21 +368,13 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         
         if (statusMsg != null) {
             Spacer(Modifier.height(8.dp))
-            Text(
-                text = statusMsg!!, 
-                style = MaterialTheme.typography.labelMedium, 
-                color = if (statusMsg!!.startsWith("✅")) Matcha else Strawberry
-            )
+            Text(text = statusMsg!!, style = MaterialTheme.typography.labelMedium, color = if (statusMsg!!.startsWith("✅")) Matcha else Strawberry)
         }
         
         Spacer(Modifier.height(16.dp))
-        
-        // 浅色分割线
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Outline.copy(alpha = 0.2f)))
-        
         Spacer(Modifier.height(16.dp))
         
-        // === 清空数据按钮 ===
         GradientButton(
             text = if (confirmClear) "再点一次确认清空" else "清空所有本地记录",
             onClick = {
@@ -411,14 +387,11 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                     confirmClear = true
                 }
             },
-            colors = if (confirmClear) {
-                listOf(Color(0xFFE53935), Color(0xFFEF5350))
-            } else {
-                listOf(Strawberry, Color(0xFFFFB3C6))
-            },
+            colors = if (confirmClear) listOf(Color(0xFFE53935), Color(0xFFEF5350)) else listOf(Strawberry, Color(0xFFFFB3C6)),
         )
     }
 }
+
 @Composable
 private fun SettingsAboutCard() {
     val context = LocalContext.current
@@ -444,6 +417,60 @@ private fun SettingsAboutCard() {
             }
         }
     }
+}
+
+// 👇 下面是补全的成就勋章和连续天数计算
+
+@Composable
+private fun Achievements(items: List<Drink>, streak: Int) {
+    val brandCount = items.map { it.brand }.distinct().size
+    val sugarCount = items.map { it.sugar }.distinct().size
+    val photoCount = items.count { it.photoPath != null }
+    val total = items.size
+    val badges = listOf(
+        Triple("🌱", "第一杯", total >= 1), Triple("🧋", "十杯达成", total >= 10),
+        Triple("🏅", "五十杯", total >= 50), Triple("👑", "百杯王者", total >= 100),
+        Triple("🔥", "连续三天", streak >= 3), Triple("⚡", "连续七天", streak >= 7),
+        Triple("🧭", "尝鲜达人", brandCount >= 5), Triple("🍬", "甜度全通", sugarCount >= 5),
+        Triple("📷", "拍照记录", photoCount >= 5),
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        badges.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { (emoji, label, unlocked) ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (unlocked) Caramel.copy(alpha = 0.15f) else Color(0xFFF4F5F0))
+                            .border(if (unlocked) 0.dp else 1.dp, Color(0xFFEEEEEE), RoundedCornerShape(16.dp))
+                            .padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = if (unlocked) emoji else "🔒", fontSize = 24.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (unlocked) Color.Black else Color(0xFFBBBBBB),
+                            fontWeight = if (unlocked) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+private fun currentStreak(items: List<Drink>): Int {
+    if (items.isEmpty()) return 0
+    val days = items.map { TimeUtil.startOfDay(it.timestamp) }.toHashSet()
+    var cursor = TimeUtil.startOfDay(System.currentTimeMillis())
+    if (!days.contains(cursor)) cursor -= 86_400_000L
+    var streak = 0
+    while (days.contains(cursor)) { streak++; cursor -= 86_400_000L }
+    return streak
 }
 
 @Composable
