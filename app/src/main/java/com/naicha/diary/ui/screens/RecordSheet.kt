@@ -119,10 +119,10 @@ fun RecordSheet(
         }
     }
 
-        val showAllBrands = remember(customBrands, hiddenBrands, savedBrandOrder, category) {
+            val showAllBrands = remember(customBrands, hiddenBrands, savedBrandOrder, category) {
         val base = (Catalog.brandsOf(category) + customBrands).filter { !hiddenBrands.contains(it.name) }
         if (savedBrandOrder.isEmpty()) {
-            // 没有排序记录时，自定义品牌默认在最前面
+            // 没有排序记录时，旧逻辑保持不变
             val custom = base.filter { b -> customBrands.any { it.name == b.name } }
             val catalog = base.filter { b -> customBrands.none { it.name == b.name } }
             custom + catalog
@@ -130,16 +130,20 @@ fun RecordSheet(
             val byName = base.associateBy { it.name }
             // 找出不在已保存顺序里的新品牌
             val notInOrder = base.filter { it.name !in savedBrandOrder }
-            val newCustoms = notInOrder.filter { b -> customBrands.any { it.name == b.name } }
-            val newOthers = notInOrder.filter { b -> customBrands.none { it.name == b.name } }
-
+            
             val ordered = ArrayList<Brand>()
-            // 新加的自定义品牌放最前面
-            ordered.addAll(newCustoms)
-            // 再按之前保存的顺序排
+            // 1. 按之前保存的顺序排（同时剔除掉 notInOrder，避免重复）
             savedBrandOrder.mapNotNull { byName[it] }.forEach { ordered.add(it) }
-            // 最后放其它没记录的
-            ordered.addAll(newOthers)
+            
+            // 2. 把没记录的新品牌插到第四行第一个（索引15）
+            notInOrder.forEach { newBrand ->
+                val targetIndex = 15
+                if (ordered.size >= targetIndex) {
+                    ordered.add(targetIndex, newBrand)
+                } else {
+                    ordered.add(newBrand)
+                }
+            }
             ordered
         }
     }
