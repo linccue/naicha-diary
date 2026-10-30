@@ -218,6 +218,7 @@ fun DrinkRoot() {
                         scope.launch { pagerState.animateScrollToPage(1) } 
                     },
                     onOpenDetail = { detail = it },
+                    onOpenProfile = { scope.launch { pagerState.animateScrollToPage(3) } },
                 )
                 1 -> WallScreen(
                     items = items,
