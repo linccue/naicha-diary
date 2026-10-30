@@ -57,6 +57,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                 }
             }
 
+            // 1. 最上方的 6 个数据卡片
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatPill(label = "总杯数", value = total.toString(), accent = Caramel, modifier = Modifier.weight(1f))
@@ -74,14 +75,34 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
             }
 
             if (total > 0) {
+                // 2. 周节律
+                item {
+                    WeekRhythmCard(items)
+                }
+
+                // 3. 距离上次与平均间隔
+                item {
+                    IntervalCards(items)
+                }
+
+                // 4. 消费总额排行
+                item {
+                    SpendingRankCard(items)
+                }
+
+                // 5. 甜度偏好（调整到了消费总额下方，品牌墙上方）
                 item {
                     StatsCard {
-                        SectionHeader(title = "品类分布", subtitle = "喝了些什么")
-                        Spacer(Modifier.height(12.dp))
-                        CategoryDistribution(items = items)
+                        SectionHeader(title = "甜度偏好", subtitle = "你的甜度人格")
+                        Spacer(Modifier.height(14.dp))
+                        PreferenceBars(
+                            entries = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖").map { sugar -> sugar to items.count { it.sugar == sugar } },
+                            colors = emptyList()
+                        )
                     }
                 }
 
+                // 6. 品牌墙点亮
                 item {
                     StatsCard {
                         val unlockedCount = remember(items) { 
@@ -94,34 +115,20 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                     }
                 }
 
+                // 7. 品类分布
                 item {
                     StatsCard {
-                        SectionHeader(title = "甜度偏好", subtitle = "你的甜度人格")
-                        Spacer(Modifier.height(14.dp))
-                        PreferenceBars(
-                            entries = listOf("全糖", "七分糖", "半糖", "三分糖", "无糖").map { sugar -> sugar to items.count { it.sugar == sugar } },
-                            colors = emptyList()
-                        )
+                        SectionHeader(title = "品类分布", subtitle = "喝了些什么")
+                        Spacer(Modifier.height(12.dp))
+                        CategoryDistribution(items = items)
                     }
-                }
-
-                item {
-                    WeekRhythmCard(items)
-                }
-
-                item {
-                    IntervalCards(items)
-                }
-
-                item {
-                    SpendingRankCard(items)
                 }
             }
         }
     }
 }
 
-// ================= 极致紧凑的品类分布 =================
+// ================= 品类分布 =================
 @Composable
 private fun CategoryDistribution(items: List<Drink>) {
     val categoryData = remember(items) {
@@ -131,7 +138,6 @@ private fun CategoryDistribution(items: List<Drink>) {
     val palette = listOf(Caramel, Taro, Matcha, Strawberry, Sky, Color(0xFFF2B04A), Color(0xFFB08968), Color(0xFF95A5A6), Color(0xFF8E44AD))
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        // 高度进一步缩小到 110dp
         Box(modifier = Modifier.size(110.dp), contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val stroke = size.minDimension * 0.16f
@@ -169,7 +175,6 @@ private fun CategoryDistribution(items: List<Drink>) {
         
         Spacer(Modifier.height(12.dp))
         
-        // 图例再缩窄，减少高度占比
         Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
             categoryData.chunked(2).forEach { rowItems ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -182,7 +187,7 @@ private fun CategoryDistribution(items: List<Drink>) {
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(Color(0xFFF8F9FA))
-                                .padding(horizontal = 10.dp, vertical = 6.dp), // 从 8dp 减到 6dp
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -201,13 +206,12 @@ private fun CategoryDistribution(items: List<Drink>) {
     }
 }
 
-// ================= 极致紧凑的品牌墙点亮 =================
+// ================= 品牌墙点亮 =================
 @Composable
 private fun BrandWall(items: List<Drink>) {
     val unlockedBrands = remember(items) { items.map { it.brand }.toSet() }
     val displayBrands = remember { Catalog.brands.take(20) }
     
-    // 圆点从 36dp 缩小到 32dp，行间距减到 6dp
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         displayBrands.chunked(5).forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -236,7 +240,7 @@ private fun BrandWall(items: List<Drink>) {
     }
 }
 
-// ================= 保留组件 =================
+// ================= 其他组件 =================
 @Composable
 fun StatPill(label: String, value: String, accent: Color, modifier: Modifier = Modifier) {
     Column(
@@ -260,7 +264,6 @@ fun StatPill(label: String, value: String, accent: Color, modifier: Modifier = M
 @Composable
 fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
-        // 稍微减小了上下 padding，从 20.dp 减到 16.dp
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 20.dp, vertical = 16.dp),
         content = content
     )
