@@ -235,6 +235,9 @@ fun BrandManagerDialog(
                                 isCircle = isCircleCrop
                             )
                             BrandStore.addBrand(context, newBrand)
+                            val newOrder = listOf(newBrand.name) + savedOrder.filter { it != newBrand.name }
+                            savedOrder = newOrder
+                            saveBrandOrder(context, newOrder)
                             cropUri = null
                             showNameInput = false
                             newBrandName = ""
