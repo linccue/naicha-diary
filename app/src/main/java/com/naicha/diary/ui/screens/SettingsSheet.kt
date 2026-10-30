@@ -463,15 +463,7 @@ private fun Achievements(items: List<Drink>, streak: Int) {
     }
 }
 
-private fun currentStreak(items: List<Drink>): Int {
-    if (items.isEmpty()) return 0
-    val days = items.map { TimeUtil.startOfDay(it.timestamp) }.toHashSet()
-    var cursor = TimeUtil.startOfDay(System.currentTimeMillis())
-    if (!days.contains(cursor)) cursor -= 86_400_000L
-    var streak = 0
-    while (days.contains(cursor)) { streak++; cursor -= 86_400_000L }
-    return streak
-}
+
 
 @Composable
 private fun SmallButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
