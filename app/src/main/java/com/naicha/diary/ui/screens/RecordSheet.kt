@@ -1,5 +1,6 @@
 package com.naicha.diary.ui.screens
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -53,6 +54,19 @@ import kotlinx.coroutines.withContext
 import java.io.FileOutputStream
 import java.util.Calendar
 
+// ===== 读取 BrandManagerDialog 保存的品牌顺序（key 必须与那边一致）=====
+private const val BRAND_ORDER_PREFS_NAME = "naicha_brand_order_prefs"
+private const val BRAND_ORDER_KEY = "brand_order"
+private const val BRAND_ORDER_SEPARATOR = "\u0001"
+
+private fun loadBrandOrderForRecord(context: Context): List<String> {
+    val raw = context.getSharedPreferences(BRAND_ORDER_PREFS_NAME, Context.MODE_PRIVATE)
+        .getString(BRAND_ORDER_KEY, null) ?: return emptyList()
+    if (raw.isEmpty()) return emptyList()
+    return raw.split(BRAND_ORDER_SEPARATOR).filter { it.isNotEmpty() }
+}
+// ============================================================
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RecordSheet(
@@ -79,13 +93,11 @@ fun RecordSheet(
     var ice by remember { mutableStateOf(initial?.ice ?: "") }
     var toppings by remember { mutableStateOf(initial?.toppings ?: emptyList()) }
     var priceText by remember { mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "") }
-    
     var rating by remember { mutableStateOf(initial?.rating ?: 0f) }
-    
     var mood by remember { mutableStateOf(initial?.mood ?: "") }
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var photoName by remember { mutableStateOf(initial?.photoPath) }
-    
+
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(initial?.timestamp ?: System.currentTimeMillis()) }
@@ -95,15 +107,32 @@ fun RecordSheet(
     var aiLoading by remember { mutableStateOf(false) }
     var aiMessage by remember { mutableStateOf<String?>(null) }
     var showInAppCamera by remember { mutableStateOf(false) }
-    
+
     var showBrandManager by remember { mutableStateOf(false) }
-    
+
     LaunchedEffect(Unit) { BrandStore.init(context) }
     val customBrands by BrandStore.customBrands.collectAsState()
     val hiddenBrands by BrandStore.hiddenBrands.collectAsState()
-    
-    val showAllBrands = remember(customBrands, hiddenBrands) {
-        (Catalog.brandsOf(category) + customBrands).filter { !hiddenBrands.contains(it.name) }
+
+    // ★ 品牌排序：初始化读一次，管理弹窗关闭后重新读
+    var savedBrandOrder by remember { mutableStateOf(loadBrandOrderForRecord(context)) }
+    LaunchedEffect(showBrandManager) {
+        if (!showBrandManager) {
+            savedBrandOrder = loadBrandOrderForRecord(context)
+        }
+    }
+
+    // ★ 按 savedBrandOrder 排序，未列出的新品牌追加末尾
+    val showAllBrands = remember(customBrands, hiddenBrands, savedBrandOrder, category) {
+        val base = (Catalog.brandsOf(category) + customBrands).filter { !hiddenBrands.contains(it.name) }
+        if (savedBrandOrder.isEmpty()) {
+            base
+        } else {
+            val byName = base.associateBy { it.name }
+            val ordered = savedBrandOrder.mapNotNull { byName[it] }.toMutableList()
+            base.forEach { b -> if (ordered.none { it.name == b.name }) ordered.add(b) }
+            ordered
+        }
     }
 
     val brandColor = remember(brand, category) {
@@ -251,22 +280,20 @@ fun RecordSheet(
 
                     item { CategorySwitcher(current = category, onSelect = { switchCategory(it) }) }
 
-                                       item {
+                    item {
                         FieldGroup(title = "品牌", subtitle = "${showAllBrands.size} 个") {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                                maxItemsInEachRow = 5 // 👈 强制一排5个
+                                maxItemsInEachRow = 5
                             ) {
                                 showAllBrands.forEach { item ->
                                     BrandChip(
-                                        brand = item, 
-                                        selected = brand == item.name, 
+                                        brand = item,
+                                        selected = brand == item.name,
                                         onClick = { brand = item.name }
                                     )
                                 }
-                                // 👇 缩小后的加号按钮
-                                                               // 👇 修改后的加号按钮
                                 Box(
                                     modifier = Modifier
                                         .width(62.dp)
@@ -274,19 +301,15 @@ fun RecordSheet(
                                         .background(Color(0xFFF0F0F0))
                                         .clickable { showBrandManager = true }
                                         .padding(vertical = 6.dp)
-                                        .height(60.dp), // 👈 图标36 + 间距4 + 文字20 = 60dp
+                                        .height(60.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add, 
-                                        contentDescription = "添加品牌", 
-                                        tint = Color.Gray, 
-                                        modifier = Modifier.size(26.dp)
-                                    )
+                                    Icon(Icons.Default.Add, "添加品牌", tint = Color.Gray, modifier = Modifier.size(26.dp))
                                 }
                             }
                         }
                     }
+
                     item {
                         FieldGroup(title = "喝的是什么") {
                             Column {
@@ -309,7 +332,7 @@ fun RecordSheet(
                     item { FieldGroup(title = "规格") { ChipRow(options = Catalog.sizesFor(category), selected = cupSize, accent = brandColor) { cupSize = it } } }
                     item { FieldGroup(title = Catalog.sugarLabel(category)) { ChipRow(options = Catalog.sugarOptions(category), selected = sugar, accent = brandColor) { sugar = it } } }
                     item { FieldGroup(title = Catalog.iceLabel(category)) { ChipRow(options = Catalog.iceOptions(category), selected = ice, accent = brandColor) { ice = it } } }
-                    
+
                     item {
                         FieldGroup(title = Catalog.extraLabel(category), subtitle = "可多选") {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -398,7 +421,7 @@ fun RecordSheet(
                             )
                         }
                     }
-                    
+
                     item {
                         FieldGroup(title = "日期与时间") {
                             Row(
@@ -568,8 +591,8 @@ private fun CategorySwitcher(
             ) {
                 Text(
                     text = entry.label,
-                    fontSize = 16.sp, 
-                    color = textColor, 
+                    fontSize = 16.sp,
+                    color = textColor,
                     fontWeight = FontWeight.Black
                 )
             }
@@ -582,32 +605,32 @@ private fun BrandChip(brand: Brand, selected: Boolean, onClick: () -> Unit, modi
     val color = Color(brand.color)
     Column(
         modifier = modifier
-            .width(62.dp) // 👈 宽度缩小，配合一排5个
+            .width(62.dp)
             .height(66.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(if (selected) color.copy(alpha = 0.12f) else Color.Transparent)
             .border(if (selected) 2.dp else 0.dp, if (selected) color else Color.Transparent, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp), 
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         BrandBadge(
-            badge = brand.badge, 
-            color = color, 
-            size = 36.dp, // 👈 图标稍微缩小
-            logo = brand.logo, 
+            badge = brand.badge,
+            color = color,
+            size = 36.dp,
+            logo = brand.logo,
             logoPath = brand.logoPath,
             isCircle = brand.isCircle,
             squircle = Catalog.isSquircle(brand.name)
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = brand.name, 
-            style = MaterialTheme.typography.labelSmall, // 👈 字体缩小
-            color = if (selected) color else PearlSoft, 
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, 
-            maxLines = 1, 
-            overflow = TextOverflow.Ellipsis, 
+            text = brand.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (selected) color else PearlSoft,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 2.dp)
         )
     }
