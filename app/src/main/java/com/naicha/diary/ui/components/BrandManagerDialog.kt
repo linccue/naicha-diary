@@ -155,7 +155,7 @@ fun BrandManagerDialog(
                         
                         val newBrand = Brand(
                             name = newBrandName.trim(),
-                            category = DrinkCategory.Tea,
+                            category =DrinkCategory.MilkTea,
                             color = 0xFFC98A5B,
                             badge = newBrandName.trim().take(1),
                             logoPath = file.absolutePath,
