@@ -251,9 +251,13 @@ fun RecordSheet(
 
                     item { CategorySwitcher(current = category, onSelect = { switchCategory(it) }) }
 
-                    item {
+                                       item {
                         FieldGroup(title = "品牌", subtitle = "${showAllBrands.size} 个") {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                maxItemsInEachRow = 5 // 👈 强制一排5个
+                            ) {
                                 showAllBrands.forEach { item ->
                                     BrandChip(
                                         brand = item, 
@@ -261,21 +265,21 @@ fun RecordSheet(
                                         onClick = { brand = item.name }
                                     )
                                 }
+                                // 👇 缩小后的加号按钮
                                 Box(
                                     modifier = Modifier
-                                        .width(74.dp)
-                                        .height(74.dp)
-                                        .clip(RoundedCornerShape(22.dp))
+                                        .width(62.dp) // 和 BrandChip 一样宽
+                                        .height(66.dp) // 和 BrandChip 一样高
+                                        .clip(RoundedCornerShape(16.dp))
                                         .background(Color(0xFFF0F0F0))
                                         .clickable { showBrandManager = true },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Add, "添加品牌", tint = Color.Gray)
+                                    Icon(Icons.Default.Add, "添加品牌", tint = Color.Gray, modifier = Modifier.size(24.dp))
                                 }
                             }
                         }
                     }
-
                     item {
                         FieldGroup(title = "喝的是什么") {
                             Column {
