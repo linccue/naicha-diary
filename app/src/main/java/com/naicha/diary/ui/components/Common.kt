@@ -228,10 +228,17 @@ fun BrandBadge(
     size: Dp = 44.dp,
     modifier: Modifier = Modifier,
     logo: Int = 0,
+    logoPath: String? = null, // 👈 新增
+    isCircle: Boolean = true, // 👈 新增
     squircle: Boolean = false,
 ) {
-    val shape: Shape = if (squircle) RoundedCornerShape(size * 0.30f) else CircleShape
+    val shape: Shape = if (logoPath != null) {
+        if (isCircle) CircleShape else RoundedCornerShape(size * 0.28f)
+    } else {
+        if (squircle) RoundedCornerShape(size * 0.30f) else CircleShape
+    }
     val deep = lerp(color, Color.Black, 0.22f)
+    
     Box(
         modifier = modifier
             .size(size)
@@ -246,7 +253,20 @@ fun BrandBadge(
             .border(0.6.dp, Color(0x14000000), shape),
         contentAlignment = Alignment.Center,
     ) {
-        if (logo != 0) {
+        if (logoPath != null) {
+            val file = java.io.File(logoPath)
+            if (file.exists()) {
+                val bitmap = remember(logoPath) { android.graphics.BitmapFactory.decodeFile(file.absolutePath) }
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        } else if (logo != 0) {
             Image(
                 painter = painterResource(logo),
                 contentDescription = null,
