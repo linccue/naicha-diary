@@ -57,7 +57,6 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                 }
             }
 
-            // === 顶部 6 个极简数据卡片 ===
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatPill(label = "总杯数", value = total.toString(), accent = Caramel, modifier = Modifier.weight(1f))
@@ -105,27 +104,13 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                 item {
                     SpendingRankCard(items)
                 }
-
-                item {
-                    StatsCard {
-                        SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
-                        Spacer(Modifier.height(14.dp))
-                        Achievements(items = items, streak = streak)
-                    }
-                }
             }
         }
     }
 }
 
-// ================= 高级极简质感数据卡片 =================
 @Composable
-fun StatPill(
-    label: String,
-    value: String,
-    accent: Color,
-    modifier: Modifier = Modifier
-) {
+fun StatPill(label: String, value: String, accent: Color, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
@@ -134,45 +119,23 @@ fun StatPill(
             .padding(horizontal = 14.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFCBFF00)))
             Spacer(Modifier.width(6.dp))
-            Text(
-                text = label,
-                color = Color(0xFF888888),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1
-            )
+            Text(text = label, color = Color(0xFF888888), fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
         }
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = value,
-            color = Color.Black,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
-        )
+        Text(text = value, color = Color.Black, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
 @Composable
 fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.White)
-            .padding(20.dp),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(20.dp),
         content = content
     )
 }
-
-// ================= 下方各模块组件 =================
 
 @Composable
 private fun WeekRhythmCard(items: List<Drink>) {
@@ -255,9 +218,7 @@ private fun IntervalCards(items: List<Drink>) {
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Column(
-            modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color.White).padding(16.dp)
-        ) {
+        Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color.White).padding(16.dp)) {
             Text("距离上次", color = Color(0xFF888888), fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.Bottom) {
@@ -266,9 +227,7 @@ private fun IntervalCards(items: List<Drink>) {
             }
         }
         
-        Column(
-            modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color.White).padding(16.dp)
-        ) {
+        Column(modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color.White).padding(16.dp)) {
             Text("平均间隔", color = Color(0xFF888888), fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.Bottom) {
@@ -310,36 +269,18 @@ private fun SpendingRankCard(items: List<Drink>) {
 
     val totalSpend = filteredItems.sumOf { it.price }
     val brandSpending = remember(filteredItems) {
-        filteredItems.groupBy { it.brand }
-            .mapValues { entry -> entry.value.sumOf { it.price } }
-            .toList()
-            .sortedByDescending { it.second }
-            .take(4)
+        filteredItems.groupBy { it.brand }.mapValues { entry -> entry.value.sumOf { it.price } }.toList().sortedByDescending { it.second }.take(4)
     }
 
     StatsCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SectionHeader(title = "消费总额排行", subtitle = null, modifier = Modifier.weight(1f))
             
-            Row(
-                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF4F5F0)).padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Row(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF4F5F0)).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 listOf("周", "月", "年").forEach { p ->
                     val selected = period == p
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(if (selected) Color(0xFFCBFF00) else Color.Transparent)
-                            .clickable { period = p }
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = p,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selected) Color.Black else Color.Gray
-                        )
+                    Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(if (selected) Color(0xFFCBFF00) else Color.Transparent).clickable { period = p }.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                        Text(text = p, style = MaterialTheme.typography.labelMedium, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) Color.Black else Color.Gray)
                     }
                 }
             }
@@ -361,10 +302,7 @@ private fun SpendingRankCard(items: List<Drink>) {
         Spacer(Modifier.height(20.dp))
         
         brandSpending.forEachIndexed { index, (brandName, amount) ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(text = "${index + 1}", style = MaterialTheme.typography.titleMedium, color = if (index == 0) Color.Black else Color.LightGray, fontWeight = FontWeight.Bold, modifier = Modifier.width(24.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(text = brandName, style = MaterialTheme.typography.bodyLarge, color = Color.Black, modifier = Modifier.weight(1f))
@@ -420,85 +358,18 @@ private fun PreferenceBars(entries: List<Pair<String, Int>>, colors: List<Color>
             val textColor = if (isTop) Color.Black else Color(0xFF888888)
             
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor,
-                    fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
-                    modifier = Modifier.width(52.dp)
-                )
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(10.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFF4F5F0))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth((count.toFloat() / max).coerceIn(0f, 1f))
-                            .fillMaxHeight()
-                            .clip(CircleShape)
-                            .background(barColor)
-                    )
+                Text(text = label, style = MaterialTheme.typography.bodyMedium, color = textColor, fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.width(52.dp))
+                Box(modifier = Modifier.weight(1f).height(10.dp).clip(CircleShape).background(Color(0xFFF4F5F0))) {
+                    Box(modifier = Modifier.fillMaxWidth((count.toFloat() / max).coerceIn(0f, 1f)).fillMaxHeight().clip(CircleShape).background(barColor))
                 }
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    text = "$count",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor,
-                    fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
-                    modifier = Modifier.width(20.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End
-                )
+                Text(text = "$count", style = MaterialTheme.typography.bodyMedium, color = textColor, fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.width(20.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
             }
         }
     }
 }
 
-@Composable
-private fun Achievements(items: List<Drink>, streak: Int) {
-    val brandCount = items.map { it.brand }.distinct().size
-    val sugarCount = items.map { it.sugar }.distinct().size
-    val photoCount = items.count { it.photoPath != null }
-    val total = items.size
-    val badges = listOf(
-        Triple("🌱", "第一杯", total >= 1), Triple("🧋", "十杯达成", total >= 10),
-        Triple("🏅", "五十杯", total >= 50), Triple("👑", "百杯王者", total >= 100),
-        Triple("🔥", "连续三天", streak >= 3), Triple("⚡", "连续七天", streak >= 7),
-        Triple("🧭", "尝鲜达人", brandCount >= 5), Triple("🍬", "甜度全通", sugarCount >= 5),
-        Triple("📷", "拍照记录", photoCount >= 5),
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        badges.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { (emoji, label, unlocked) ->
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (unlocked) Color(0xFFCBFF00).copy(alpha = 0.15f) else Color(0xFFF4F5F0))
-                            .border(if (unlocked) 0.dp else 1.dp, Color(0xFFEEEEEE), RoundedCornerShape(16.dp))
-                            .padding(vertical = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = if (unlocked) emoji else "🔒", fontSize = 24.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (unlocked) Color.Black else Color(0xFFBBBBBB),
-                            fontWeight = if (unlocked) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
-
-private fun currentStreak(items: List<Drink>): Int {
+fun currentStreak(items: List<Drink>): Int {
     if (items.isEmpty()) return 0
     val days = items.map { TimeUtil.startOfDay(it.timestamp) }.toHashSet()
     var cursor = TimeUtil.startOfDay(System.currentTimeMillis())
