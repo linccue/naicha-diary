@@ -15,7 +15,7 @@ enum class DrinkCategory(val label: String, val badge: String, val accent: Long)
     PureTea("纯茶", "茶", 0xFF3B8C4E),
     Bottled("瓶装", "瓶", 0xFF2E86DE),
     Alcohol("酒类", "酒", 0xFF8E44AD),
-    Yogurt("酸奶", "酸", 0xFFE8A0BF); // 👈 去掉了 Other
+    Yogurt("酸奶", "酸", 0xFFE8A0BF);
 
     companion object {
         fun of(label: String): DrinkCategory = entries.firstOrNull { it.label == label } ?: MilkTea
@@ -83,7 +83,6 @@ object Catalog {
         Brand("煲珠公", DrinkCategory.MilkTea, 0xFF3A3EC5, "煲", R.drawable.logo_baozhugong),
         Brand("陈文鼎", DrinkCategory.MilkTea, 0xFF8B4A2B, "陈", R.drawable.logo_chenwending),
         Brand("瑞幸咖啡", DrinkCategory.Coffee, 0xFF1C3F94, "瑞", R.drawable.logo_luckin),
-        
         Brand("古茗", DrinkCategory.MilkTea, 0xFF2B2B2B, "古", R.drawable.logo_guming),
         Brand("沪上阿姨", DrinkCategory.MilkTea, 0xFFC7303E, "沪", R.drawable.logo_hushangayi),
         Brand("茶百道", DrinkCategory.MilkTea, 0xFF2E86DE, "茶", R.drawable.logo_chabaidao),
@@ -133,7 +132,6 @@ object Catalog {
         Brand("茉沏", DrinkCategory.MilkTea, 0xFF7F8C8D, "茉", R.drawable.logo_moqi),
         Brand("让茶", DrinkCategory.MilkTea, 0xFF27AE60, "让", R.drawable.logo_rangcha),
         Brand("真茶屋", DrinkCategory.MilkTea, 0xFF2ECC71, "真", R.drawable.logo_zhenchawu),
-        
         Brand("星巴克", DrinkCategory.Coffee, 0xFF00704A, "星", R.drawable.logo_starbucks),
         Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库", R.drawable.logo_cotti),
         Brand("Manner", DrinkCategory.Coffee, 0xFFC59B5F, "M", R.drawable.logo_manner),
@@ -142,9 +140,11 @@ object Catalog {
         Brand("Peet's", DrinkCategory.Coffee, 0xFF1D4E4F, "P", R.drawable.logo_peets),
         Brand("挪瓦咖啡", DrinkCategory.Coffee, 0xFFEB6B2A, "挪", R.drawable.logo_nowwa),
         Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸", R.drawable.logo_luckycup),
-        
         Brand("自制 / 其他", DrinkCategory.MilkTea, 0xFF8D6E63, "自", R.drawable.logo_mixue)
     )
+
+    // 👇 核心新增：让全局能查到你添加的自定义品牌
+    var extraBrands: List<Brand> = emptyList()
 
     val commonNames = mapOf(
         DrinkCategory.MilkTea to listOf("珍珠奶茶", "芋泥啵啵", "杨枝甘露", "布丁奶茶", "烤奶"),
@@ -158,15 +158,22 @@ object Catalog {
     )
 
     fun brandsOf(category: DrinkCategory): List<Brand> = brands
+    
+    // 👇 核心修改：优先查自定义品牌
     fun brandOf(name: String): Brand = 
         brands.firstOrNull { it.name == name } 
         ?: extraBrands.firstOrNull { it.name == name } 
         ?: brands.last()
+        
     fun colorOf(name: String): Long = brandOf(name).color
-        fun isSquircle(name: String): Boolean {
+    
+    // 👇 核心修改：让自定义的方形图标也能生效
+    fun isSquircle(name: String): Boolean {
         if (name in setOf("喜茶", "奈雪的茶", "霸王茶姬", "陈文鼎", "煲珠公")) return true
         val custom = extraBrands.firstOrNull { it.name == name }
         return custom?.let { !it.isCircle } ?: false
+    }
+    
     fun sizesFor(category: DrinkCategory): List<String> = listOf("小杯", "中杯", "大杯", "超大杯")
     fun sugarOptions(category: DrinkCategory): List<String> = sugars
     fun iceOptions(category: DrinkCategory): List<String> = listOf("热饮", "常温", "去冰", "少冰", "正常冰")
@@ -177,7 +184,11 @@ object Catalog {
 }
 
 object BrandStore {
-    // ... 上面代码不动 ...
+    private var prefs: android.content.SharedPreferences? = null
+    private val _customBrands = MutableStateFlow<List<Brand>>(emptyList())
+    val customBrands: StateFlow<List<Brand>> = _customBrands.asStateFlow()
+    private val _hiddenBrands = MutableStateFlow<Set<String>>(emptySet())
+    val hiddenBrands: StateFlow<Set<String>> = _hiddenBrands.asStateFlow()
 
     fun init(context: android.content.Context) {
         if (prefs != null) return
@@ -221,17 +232,5 @@ object BrandStore {
         if (hide) current.addAll(names) else current.removeAll(names)
         _hiddenBrands.value = current
         prefs?.edit()?.putString("hidden", current.joinToString(","))?.apply()
-    }
-        fun deleteBrands(context: android.content.Context, names: Set<String>) {
-        // 1. 如果是自定义品牌，直接从列表中彻底移除
-        _customBrands.value = _customBrands.value.filterNot { names.contains(it.name) }
-        prefs?.edit()?.putString("custom", kotlinx.serialization.json.Json.encodeToString(_customBrands.value))?.apply()
-        
-        // 2. 如果是系统内置品牌（代码里写死的），将其设置为隐藏（变透明）
-        val catalogNames = Catalog.brands.map { it.name }.toSet()
-        val toHide = names.intersect(catalogNames)
-        if (toHide.isNotEmpty()) {
-            toggleHide(context, toHide, true)
-        }
     }
 }
