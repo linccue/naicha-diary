@@ -47,7 +47,7 @@ import com.naicha.diary.util.TimeUtil
 import java.util.Calendar
 import java.util.Locale
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     items: List<Drink>,
@@ -55,7 +55,6 @@ fun HomeScreen(
     onAiRecord: () -> Unit,
     onOpenWall: () -> Unit,
     onOpenDetail: (Drink) -> Unit,
-    onOpenProfile: () -> Unit, // 👈 接收跳转头像的点击事件
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -67,6 +66,10 @@ fun HomeScreen(
     var sortOrder by remember { mutableStateOf("默认") }
     var searchQuery by remember { mutableStateOf("") }
     var activeQuickFilter by remember { mutableStateOf<String?>(null) }
+
+    // 控制成就弹窗
+    var showAchievements by remember { mutableStateOf(false) }
+    val achievementSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // 读取不喝打卡状态
     val prefs = remember { context.getSharedPreferences("abstinence_prefs", android.content.Context.MODE_PRIVATE) }
@@ -182,8 +185,8 @@ fun HomeScreen(
                             color = Color.Black
                         )
                     }
-                    // 👇 右侧头像增加点击事件
-                    Box(modifier = Modifier.clip(CircleShape).clickable { onOpenProfile() }) {
+                    // 👇 右侧头像点击，触发独立弹窗
+                    Box(modifier = Modifier.clip(CircleShape).clickable { showAchievements = true }) {
                         Image(
                             painter = painterResource(id = R.drawable.girl_avatar),
                             contentDescription = "头像",
@@ -323,8 +326,40 @@ fun HomeScreen(
                 }
             }
         }
+        
+        // 👇 独立二级窗口：点击头像弹出的成就勋章
+        if (showAchievements) {
+            ModalBottomSheet(
+                onDismissRequest = { showAchievements = false },
+                sheetState = achievementSheetState,
+                containerColor = Color(0xFFF4F5F0),
+                dragHandle = {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                        Box(Modifier.width(44.dp).height(5.dp).clip(CircleShape).background(Color.LightGray))
+                    }
+                }
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)) {
+                    Text(
+                        text = "我的成就 🏆",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    SoftCard {
+                        SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
+                        Spacer(Modifier.height(14.dp))
+                        Achievements(items = items, streak = currentStreak(items))
+                    }
+                    Spacer(Modifier.height(40.dp)) // 底部留白，防遮挡
+                }
+            }
+        }
     }
 }
+
+// ================= 辅助组件与函数 =================
 
 @Composable
 private fun IconCircleButton(icon: @Composable () -> Unit, isActive: Boolean, onClick: () -> Unit) {
@@ -422,6 +457,60 @@ private fun EmptyHint(onRecord: () -> Unit) {
         Spacer(Modifier.height(4.dp))
         Text(text = "喝下的每一杯，都值得被记住", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+// 成就勋章组件
+@Composable
+private fun Achievements(items: List<Drink>, streak: Int) {
+    val brandCount = items.map { it.brand }.distinct().size
+    val sugarCount = items.map { it.sugar }.distinct().size
+    val photoCount = items.count { it.photoPath != null }
+    val total = items.size
+    val badges = listOf(
+        Triple("🌱", "第一杯", total >= 1), Triple("🧋", "十杯达成", total >= 10),
+        Triple("🏅", "五十杯", total >= 50), Triple("👑", "百杯王者", total >= 100),
+        Triple("🔥", "连续三天", streak >= 3), Triple("⚡", "连续七天", streak >= 7),
+        Triple("🧭", "尝鲜达人", brandCount >= 5), Triple("🍬", "甜度全通", sugarCount >= 5),
+        Triple("📷", "拍照记录", photoCount >= 5),
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        badges.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { (emoji, label, unlocked) ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (unlocked) Caramel.copy(alpha = 0.15f) else Color(0xFFF4F5F0))
+                            .border(if (unlocked) 0.dp else 1.dp, Color(0xFFEEEEEE), RoundedCornerShape(16.dp))
+                            .padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = if (unlocked) emoji else "🔒", fontSize = 24.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (unlocked) Color.Black else Color(0xFFBBBBBB),
+                            fontWeight = if (unlocked) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+// 连续天数计算
+private fun currentStreak(items: List<Drink>): Int {
+    if (items.isEmpty()) return 0
+    val days = items.map { TimeUtil.startOfDay(it.timestamp) }.toHashSet()
+    var cursor = TimeUtil.startOfDay(System.currentTimeMillis())
+    if (!days.contains(cursor)) cursor -= 86_400_000L
+    var streak = 0
+    while (days.contains(cursor)) { streak++; cursor -= 86_400_000L }
+    return streak
 }
 
 fun formatMoney(value: Double): String = if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.CHINA, "%.1f", value)
