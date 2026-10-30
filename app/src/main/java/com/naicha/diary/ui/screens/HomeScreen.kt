@@ -63,6 +63,7 @@ fun HomeScreen(
     onAiRecord: () -> Unit,
     onOpenWall: () -> Unit,
     onOpenDetail: (Drink) -> Unit,
+    onOpenProfile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -184,6 +185,7 @@ fun HomeScreen(
                         )
                     }
                     // 右侧头像
+                     Box(modifier = Modifier.clip(CircleShape).clickable { onOpenProfile() }) {
                     Image(
                         painter = painterResource(id = R.drawable.girl_avatar),
                         contentDescription = "头像",
