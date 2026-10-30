@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -29,11 +30,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -51,8 +56,6 @@ import com.naicha.diary.ui.theme.Caramel
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
-import kotlin.math.max
-import kotlin.math.min
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -75,14 +78,16 @@ fun BrandManagerDialog(
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // 1. 裁剪状态
+    // 裁剪状态
     var cropUri by remember { mutableStateOf<Uri?>(null) }
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isCircleCrop by remember { mutableStateOf(true) }
     
-    // 缩放和移动状态
+    // 缩放、移动状态，以及捕获画面的 GraphicsLayer
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    val graphicsLayer = rememberGraphicsLayer()
+    
     val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
         scale = (scale * zoomChange).coerceIn(0.5f, 3f)
         offset += panChange
@@ -122,21 +127,31 @@ fun BrandManagerDialog(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            bitmap = originalBitmap!!.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
+                        Box(
                             modifier = Modifier
                                 .size(280.dp)
                                 .clip(if (isCircleCrop) CircleShape else RoundedCornerShape(16.dp))
-                                .graphicsLayer(
-                                    scaleX = scale,
-                                    scaleY = scale,
-                                    translationX = offset.x,
-                                    translationY = offset.y
-                                )
-                                .transformable(transformableState)
-                        )
+                                // 👇 将当前 Box 内的画面捕获到 graphicsLayer
+                                .drawWithContent {
+                                    graphicsLayer.record { this@drawWithContent.drawContent() }
+                                    drawLayer(graphicsLayer)
+                                }
+                        ) {
+                            Image(
+                                bitmap = originalBitmap!!.asImageBitmap(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer(
+                                        scaleX = scale,
+                                        scaleY = scale,
+                                        translationX = offset.x,
+                                        translationY = offset.y
+                                    )
+                                    .transformable(transformableState)
+                            )
+                        }
                     }
 
                     Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp), horizontalArrangement = Arrangement.Center) {
@@ -156,7 +171,7 @@ fun BrandManagerDialog(
     }
 
     // ================= 2. 输入品牌名称 =================
-    if (showNameInput && originalBitmap != null) {
+    if (showNameInput) {
         AlertDialog(
             onDismissRequest = { showNameInput = false },
             title = { Text("输入品牌名称") },
@@ -171,20 +186,11 @@ fun BrandManagerDialog(
             confirmButton = {
                 TextButton(onClick = {
                     if (newBrandName.isNotBlank()) {
-                        // 按照缩放比例截取图片
-                        val bmp = originalBitmap!!
-                        val side = min(bmp.width, bmp.height)
-                        val cx = (bmp.width - side) / 2 + (offset.x / scale).toInt()
-                        val cy = (bmp.height - side) / 2 + (offset.y / scale).toInt()
-                        val finalSide = (side / scale).toInt().coerceAtLeast(50)
-                        
-                        val x = (cx - finalSide / 2).coerceIn(0, bmp.width - finalSide)
-                        val y = (cy - finalSide / 2).coerceIn(0, bmp.height - finalSide)
-
-                        val cropped = Bitmap.createBitmap(bmp, x, y, finalSide, finalSide)
+                        // 👇 直接截取预览框里的画面（所见即所得）
+                        val finalBitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
                         
                         val file = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
-                        FileOutputStream(file).use { cropped.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                        FileOutputStream(file).use { finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
                         
                         val newBrand = Brand(
                             name = newBrandName.trim(),
@@ -279,15 +285,20 @@ fun BrandManagerDialog(
                                         showMenu = false
                                     }
                                 )
+                                DropdownMenuItem(
+                                    text = { Text("显示全部") }, // 👈 恢复显示全部
+                                    onClick = {
+                                        BrandStore.toggleHide(context, allBrands.map { it.name }.toSet(), false)
+                                        showMenu = false
+                                    }
+                                )
                             }
                         }
                     }
 
-                    // 品牌网格（5列，紧凑布局，支持搜索过滤）
+                    // 品牌网格（5列，支持搜索，隐藏的变透明）
                     val filteredBrands = allBrands.filter { brand ->
-                        // 如果没有被隐藏，并且符合搜索条件
-                        !hiddenBrands.contains(brand.name) &&
-                        (searchQuery.isBlank() || brand.name.contains(searchQuery, ignoreCase = true))
+                        searchQuery.isBlank() || brand.name.contains(searchQuery, ignoreCase = true)
                     }
 
                     LazyVerticalGrid(
@@ -298,9 +309,12 @@ fun BrandManagerDialog(
                     ) {
                         items(filteredBrands) { brand ->
                             val isSelected = selectedBrands.contains(brand.name)
+                            val isHidden = hiddenBrands.contains(brand.name) // 👈 判断是否隐藏
+
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
+                                    .alpha(if (isHidden) 0.3f else 1f) // 👈 隐藏的透明度变低
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(if (isSelected) Color.LightGray else Color.Transparent)
                                     .combinedClickable(
@@ -321,7 +335,7 @@ fun BrandManagerDialog(
                                 BrandBadge(
                                     badge = brand.badge,
                                     color = Color(brand.color),
-                                    size = 44.dp, // 👈 图标缩小到44dp
+                                    size = 44.dp,
                                     logo = brand.logo,
                                     logoPath = brand.logoPath,
                                     isCircle = brand.isCircle,
@@ -330,8 +344,8 @@ fun BrandManagerDialog(
                                 Spacer(Modifier.height(4.dp))
                                 Text(
                                     text = brand.name,
-                                    fontSize = 11.sp, // 👈 字号缩小
-                                    color = Color.Black,
+                                    fontSize = 11.sp,
+                                    color = if (isHidden) Color.Gray else Color.Black, // 隐藏文字也变灰
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     textAlign = TextAlign.Center
