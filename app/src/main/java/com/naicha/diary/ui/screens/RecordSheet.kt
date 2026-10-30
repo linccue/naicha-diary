@@ -573,18 +573,36 @@ private fun CategorySwitcher(
 @Composable
 private fun BrandChip(brand: Brand, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val color = Color(brand.color)
-    Column(modifier = modifier.width(74.dp).clip(RoundedCornerShape(22.dp)).background(if (selected) color.copy(alpha = 0.12f) else Color.Transparent).border(if (selected) 2.dp else 0.dp, if (selected) color else Color.Transparent, RoundedCornerShape(22.dp)).clickable(onClick = onClick).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = modifier
+            .width(62.dp) // 👈 宽度缩小，配合一排5个
+            .height(66.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) color.copy(alpha = 0.12f) else Color.Transparent)
+            .border(if (selected) 2.dp else 0.dp, if (selected) color else Color.Transparent, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp), 
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         BrandBadge(
             badge = brand.badge, 
             color = color, 
-            size = 40.dp, 
+            size = 36.dp, // 👈 图标稍微缩小
             logo = brand.logo, 
             logoPath = brand.logoPath,
             isCircle = brand.isCircle,
             squircle = Catalog.isSquircle(brand.name)
         )
-        Spacer(Modifier.height(6.dp))
-        Text(text = brand.name, style = MaterialTheme.typography.labelMedium, color = if (selected) color else PearlSoft, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 2.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = brand.name, 
+            style = MaterialTheme.typography.labelSmall, // 👈 字体缩小
+            color = if (selected) color else PearlSoft, 
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, 
+            maxLines = 1, 
+            overflow = TextOverflow.Ellipsis, 
+            modifier = Modifier.padding(horizontal = 2.dp)
+        )
     }
 }
 
