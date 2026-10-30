@@ -342,6 +342,21 @@ fun BrandManagerDialog(
                                     BrandStore.toggleHide(context, allBrands.map { b -> b.name }.toSet(), false)
                                     showMenu = false
                                 })
+                                                                HorizontalDivider(color = Color.LightGray) // 加一条分割线
+                                DropdownMenuItem(
+                                    text = { Text("删除选中", color = Color.Red) },
+                                    onClick = {
+                                        if (selectedBrands.isNotEmpty()) {
+                                            scope.launch {
+                                                // 💡 你的 BrandStore 里删除方法可能不叫 deleteBrands
+                                                // 如果这行报错，请把 deleteBrands 换成你 BrandStore 里实际的方法名
+                                                BrandStore.deleteBrands(context, selectedBrands)
+                                                selectedBrands = emptySet()
+                                            }
+                                        }
+                                        showMenu = false
+                                    }
+                                )
                             }
                         }
                     }
