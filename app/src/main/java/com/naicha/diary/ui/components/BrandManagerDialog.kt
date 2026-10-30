@@ -1,5 +1,6 @@
 package com.naicha.diary.ui.components
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -9,20 +10,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -35,6 +38,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -45,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import com.naicha.diary.data.Brand
 import com.naicha.diary.data.BrandStore
 import com.naicha.diary.data.Catalog
@@ -56,6 +61,26 @@ import java.io.FileOutputStream
 import java.util.UUID
 import kotlin.math.min
 
+// ===== 品牌顺序持久化（key 名称与 RecordSheet.kt 必须一致）=====
+private const val ORDER_PREFS_NAME = "naicha_brand_order_prefs"
+private const val ORDER_KEY = "brand_order"
+private const val ORDER_SEPARATOR = "\u0001"
+
+private fun loadSavedBrandOrder(context: Context): List<String> {
+    val raw = context.getSharedPreferences(ORDER_PREFS_NAME, Context.MODE_PRIVATE)
+        .getString(ORDER_KEY, null) ?: return emptyList()
+    if (raw.isEmpty()) return emptyList()
+    return raw.split(ORDER_SEPARATOR).filter { it.isNotEmpty() }
+}
+
+private fun saveBrandOrder(context: Context, order: List<String>) {
+    context.getSharedPreferences(ORDER_PREFS_NAME, Context.MODE_PRIVATE)
+        .edit()
+        .putString(ORDER_KEY, order.joinToString(ORDER_SEPARATOR))
+        .apply()
+}
+// ============================================================
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BrandManagerDialog(
@@ -66,28 +91,44 @@ fun BrandManagerDialog(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     LaunchedEffect(Unit) { BrandStore.init(context) }
-    
+
     val customBrands by BrandStore.customBrands.collectAsState()
     val hiddenBrands by BrandStore.hiddenBrands.collectAsState()
-    
-    // 合并所有品牌
+
     val allBrands = remember(customBrands) { Catalog.brands + customBrands }
 
-    // 状态管理
+    // 品牌顺序（持久化）
+    var savedOrder by remember { mutableStateOf(loadSavedBrandOrder(context)) }
+    val orderedAllBrands = remember(allBrands, savedOrder) {
+        if (savedOrder.isEmpty()) {
+            allBrands
+        } else {
+            val map = allBrands.associateBy { it.name }
+            val result = savedOrder.mapNotNull { map[it] }.toMutableList()
+            allBrands.forEach { b -> if (result.none { it.name == b.name }) result.add(b) }
+            result
+        }
+    }
+
     var selectedBrands by remember { mutableStateOf(setOf<String>()) }
     var showMenu by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
+    // 拖拽状态
+    var isSortMode by remember { mutableStateOf(false) }
+    val gridState = rememberLazyGridState()
+    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    val orderedBrandsState by rememberUpdatedState(orderedAllBrands)
+    val savedOrderState by rememberUpdatedState(savedOrder)
+
     // 裁剪状态
     var cropUri by remember { mutableStateOf<Uri?>(null) }
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isCircleCrop by remember { mutableStateOf(true) }
-    
-    // 缩放、移动状态
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    
     val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
         scale = (scale * zoomChange).coerceIn(0.5f, 3f)
         offset += panChange
@@ -99,7 +140,7 @@ fun BrandManagerDialog(
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             cropUri = uri
-            context.contentResolver.openInputStream(uri)?.use { 
+            context.contentResolver.openInputStream(uri)?.use {
                 originalBitmap = BitmapFactory.decodeStream(it)
             }
             scale = 1f
@@ -107,7 +148,7 @@ fun BrandManagerDialog(
         }
     }
 
-    // ================= 1. 裁剪预览界面 =================
+    // ================= 1. 裁剪预览 =================
     if (cropUri != null && originalBitmap != null) {
         Dialog(onDismissRequest = { cropUri = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
@@ -121,34 +162,18 @@ fun BrandManagerDialog(
                         Text("双指缩放 / 拖拽移动", color = Color.White, fontSize = 16.sp)
                         IconButton(onClick = { showNameInput = true }) { Icon(Icons.Default.Check, "确定", tint = Color.Green) }
                     }
-
-                    // 预览区域
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(280.dp)
-                                .clip(if (isCircleCrop) CircleShape else RoundedCornerShape(16.dp))
-                        ) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Box(modifier = Modifier.size(280.dp).clip(if (isCircleCrop) CircleShape else RoundedCornerShape(16.dp))) {
                             Image(
                                 bitmap = originalBitmap!!.asImageBitmap(),
                                 contentDescription = null,
                                 contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer(
-                                        scaleX = scale,
-                                        scaleY = scale,
-                                        translationX = offset.x,
-                                        translationY = offset.y
-                                    )
+                                modifier = Modifier.fillMaxSize()
+                                    .graphicsLayer(scaleX = scale, scaleY = scale, translationX = offset.x, translationY = offset.y)
                                     .transformable(transformableState)
                             )
                         }
                     }
-
                     Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp), horizontalArrangement = Arrangement.Center) {
                         Button(
                             onClick = { isCircleCrop = true },
@@ -165,7 +190,7 @@ fun BrandManagerDialog(
         }
     }
 
-    // ================= 2. 输入品牌名称 =================
+    // ================= 2. 输入品牌名 =================
     if (showNameInput) {
         AlertDialog(
             onDismissRequest = { showNameInput = false },
@@ -184,10 +209,8 @@ fun BrandManagerDialog(
                         scope.launch {
                             val frameSizePx = with(density) { 280.dp.toPx() }
                             val finalBitmap = cropImageToCenter(originalBitmap!!, scale, offset, frameSizePx)
-                            
                             val file = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
                             FileOutputStream(file).use { finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                            
                             val newBrand = Brand(
                                 name = newBrandName.trim(),
                                 category = DrinkCategory.MilkTea,
@@ -197,7 +220,6 @@ fun BrandManagerDialog(
                                 isCircle = isCircleCrop
                             )
                             BrandStore.addBrand(context, newBrand)
-                            
                             cropUri = null
                             showNameInput = false
                             newBrandName = ""
@@ -220,13 +242,13 @@ fun BrandManagerDialog(
                 color = Color(0xFFF4F5F0)
             ) {
                 Column {
-                    // 顶部工具栏
+                    // 工具栏
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "关闭") }
-                        
+
                         if (showSearch) {
                             OutlinedTextField(
                                 value = searchQuery,
@@ -242,79 +264,168 @@ fun BrandManagerDialog(
                                 )
                             )
                         } else {
-                            Text("管理品牌", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text(
+                                text = if (isSortMode) "拖拽排序（长按拖动）" else "管理品牌",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
-                        
-                        // 搜索按钮
-                        IconButton(onClick = { 
-                            showSearch = !showSearch 
+
+                        // 搜索
+                        IconButton(onClick = {
+                            showSearch = !showSearch
                             if (!showSearch) searchQuery = ""
+                            if (showSearch) isSortMode = false
                         }) {
                             Icon(Icons.Default.Search, "搜索", tint = if (showSearch) Caramel else Color.Black)
                         }
 
-                        // 加号（添加品牌）
-                        IconButton(onClick = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                            Icon(Icons.Default.Add, "添加品牌")
+                        // ★ 排序按钮（搜索右边、加号左边）
+                        IconButton(onClick = {
+                            if (isSortMode) {
+                                isSortMode = false
+                                draggingIndex = null
+                                dragOffset = Offset.Zero
+                                saveBrandOrder(context, savedOrder)
+                            } else {
+                                isSortMode = true
+                                showSearch = false
+                                searchQuery = ""
+                            }
+                        }) {
+                            Icon(
+                                imageVector = if (isSortMode) Icons.Default.Check else Icons.Default.List,
+                                contentDescription = if (isSortMode) "完成排序" else "排序",
+                                tint = if (isSortMode) Caramel else Color.Black
+                            )
                         }
-                        
+
+                        // 加号
+                        IconButton(onClick = {
+                            if (!isSortMode) {
+                                imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }
+                        }) {
+                            Icon(Icons.Default.Add, "添加品牌", tint = if (isSortMode) Color.Gray else Color.Black)
+                        }
+
                         // 三点菜单
                         Box {
                             IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "菜单") }
                             DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("隐藏选中") },
-                                    onClick = {
-                                        if (selectedBrands.isNotEmpty()) {
-                                            BrandStore.toggleHide(context, selectedBrands, true)
-                                            selectedBrands = emptySet()
-                                        }
-                                        showMenu = false
+                                DropdownMenuItem(text = { Text("隐藏选中") }, onClick = {
+                                    if (selectedBrands.isNotEmpty()) {
+                                        BrandStore.toggleHide(context, selectedBrands, true)
+                                        selectedBrands = emptySet()
                                     }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("显示选中") },
-                                    onClick = {
-                                        if (selectedBrands.isNotEmpty()) {
-                                            BrandStore.toggleHide(context, selectedBrands, false)
-                                            selectedBrands = emptySet()
-                                        }
-                                        showMenu = false
+                                    showMenu = false
+                                })
+                                DropdownMenuItem(text = { Text("显示选中") }, onClick = {
+                                    if (selectedBrands.isNotEmpty()) {
+                                        BrandStore.toggleHide(context, selectedBrands, false)
+                                        selectedBrands = emptySet()
                                     }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("显示全部") }, 
-                                    onClick = {
-                                        BrandStore.toggleHide(context, allBrands.map { it.name }.toSet(), false)
-                                        showMenu = false
-                                    }
-                                )
+                                    showMenu = false
+                                })
+                                DropdownMenuItem(text = { Text("显示全部") }, onClick = {
+                                    BrandStore.toggleHide(context, allBrands.map { it.name }.toSet(), false)
+                                    showMenu = false
+                                })
                             }
                         }
                     }
 
-                    // 品牌网格（5列，支持搜索，隐藏的变透明）
-                    val filteredBrands = allBrands.filter { brand ->
-                        searchQuery.isBlank() || brand.name.contains(searchQuery, ignoreCase = true)
-                    }
+                    val filteredBrands = if (isSortMode) orderedAllBrands
+                    else orderedAllBrands.filter { searchQuery.isBlank() || it.name.contains(searchQuery, ignoreCase = true) }
 
                     LazyVerticalGrid(
+                        state = gridState,
                         columns = GridCells.Fixed(5),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxSize().pointerInput(isSortMode) {
+                            if (!isSortMode) return@pointerInput
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { touchOffset ->
+                                    val item = gridState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+                                        touchOffset.x in info.offset.x.toFloat()..(info.offset.x + info.size.width).toFloat() &&
+                                        touchOffset.y in info.offset.y.toFloat()..(info.offset.y + info.size.height).toFloat()
+                                    }
+                                    if (item != null) {
+                                        draggingIndex = item.index
+                                        dragOffset = Offset.Zero
+                                    }
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val fromIndex = draggingIndex ?: return@detectDragGesturesAfterLongPress
+                                    dragOffset += dragAmount
+                                    val currentItem = gridState.layoutInfo.visibleItemsInfo
+                                        .firstOrNull { it.index == fromIndex } ?: return@detectDragGesturesAfterLongPress
+                                    val centerX = currentItem.offset.x + currentItem.size.width / 2f + dragOffset.x
+                                    val centerY = currentItem.offset.y + currentItem.size.height / 2f + dragOffset.y
+                                    val targetItem = gridState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+                                        info.index != fromIndex &&
+                                        centerX in info.offset.x.toFloat()..(info.offset.x + info.size.width).toFloat() &&
+                                        centerY in info.offset.y.toFloat()..(info.offset.y + info.size.height).toFloat()
+                                    } ?: return@detectDragGesturesAfterLongPress
+                                    val toIndex = targetItem.index
+                                    val newList = orderedBrandsState.value.toMutableList()
+                                    if (fromIndex in newList.indices && toIndex in newList.indices) {
+                                        val moved = newList.removeAt(fromIndex)
+                                        newList.add(toIndex, moved)
+                                        savedOrder = newList.map { it.name }
+                                        draggingIndex = toIndex
+                                        dragOffset -= Offset(
+                                            (targetItem.offset.x - currentItem.offset.x).toFloat(),
+                                            (targetItem.offset.y - currentItem.offset.y).toFloat()
+                                        )
+                                    }
+                                },
+                                onDragEnd = {
+                                    draggingIndex = null
+                                    dragOffset = Offset.Zero
+                                    saveBrandOrder(context, savedOrderState.value)
+                                },
+                                onDragCancel = {
+                                    draggingIndex = null
+                                    dragOffset = Offset.Zero
+                                    saveBrandOrder(context, savedOrderState.value)
+                                }
+                            )
+                        }
                     ) {
-                        items(filteredBrands) { brand ->
+                        itemsIndexed(filteredBrands, key = { _, brand -> brand.name }) { index, brand ->
                             val isSelected = selectedBrands.contains(brand.name)
                             val isHidden = hiddenBrands.contains(brand.name)
+                            val isDragging = index == draggingIndex
 
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
-                                    .alpha(if (isHidden) 0.3f else 1f) 
+                                    .zIndex(if (isDragging) 1f else 0f)
+                                    .graphicsLayer {
+                                        if (isDragging) {
+                                            translationX = dragOffset.x
+                                            translationY = dragOffset.y
+                                            shadowElevation = 12.dp.toPx()
+                                            scaleX = 1.08f
+                                            scaleY = 1.08f
+                                        }
+                                    }
+                                    .alpha(if (isHidden) 0.3f else 1f)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isSelected) Color.LightGray else Color.Transparent)
+                                    .background(
+                                        when {
+                                            isDragging -> Color.White
+                                            isSelected -> Color.LightGray
+                                            else -> Color.Transparent
+                                        }
+                                    )
                                     .combinedClickable(
+                                        enabled = !isSortMode,
                                         onClick = {
                                             if (selectedBrands.isNotEmpty()) {
                                                 selectedBrands = if (isSelected) selectedBrands - brand.name else selectedBrands + brand.name
@@ -324,7 +435,9 @@ fun BrandManagerDialog(
                                             }
                                         },
                                         onLongClick = {
-                                            selectedBrands = if (isSelected) selectedBrands - brand.name else selectedBrands + brand.name
+                                            if (!isSortMode) {
+                                                selectedBrands = if (isSelected) selectedBrands - brand.name else selectedBrands + brand.name
+                                            }
                                         }
                                     )
                                     .padding(6.dp)
@@ -356,19 +469,16 @@ fun BrandManagerDialog(
     }
 }
 
-// 👇 纯数学裁剪工具函数，绝对不报错
 private fun cropImageToCenter(bitmap: Bitmap, scale: Float, offset: Offset, frameSizePx: Float): Bitmap {
     val output = Bitmap.createBitmap(frameSizePx.toInt(), frameSizePx.toInt(), Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(output)
     val ratio = min(frameSizePx / bitmap.width, frameSizePx / bitmap.height)
     val baseWidth = bitmap.width * ratio
     val baseHeight = bitmap.height * ratio
-    
     canvas.save()
     canvas.translate(frameSizePx / 2 + offset.x, frameSizePx / 2 + offset.y)
     canvas.scale(scale, scale)
     canvas.translate(-frameSizePx / 2, -frameSizePx / 2)
-    
     val left = (frameSizePx - baseWidth) / 2
     val top = (frameSizePx - baseHeight) / 2
     val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
