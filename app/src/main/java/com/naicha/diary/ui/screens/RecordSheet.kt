@@ -54,7 +54,6 @@ import kotlinx.coroutines.withContext
 import java.io.FileOutputStream
 import java.util.Calendar
 
-// ===== 读取 BrandManagerDialog 保存的品牌顺序（key 必须与那边一致）=====
 private const val BRAND_ORDER_PREFS_NAME = "naicha_brand_order_prefs"
 private const val BRAND_ORDER_KEY = "brand_order"
 private const val BRAND_ORDER_SEPARATOR = "\u0001"
@@ -65,7 +64,6 @@ private fun loadBrandOrderForRecord(context: Context): List<String> {
     if (raw.isEmpty()) return emptyList()
     return raw.split(BRAND_ORDER_SEPARATOR).filter { it.isNotEmpty() }
 }
-// ============================================================
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -114,7 +112,6 @@ fun RecordSheet(
     val customBrands by BrandStore.customBrands.collectAsState()
     val hiddenBrands by BrandStore.hiddenBrands.collectAsState()
 
-    // ★ 品牌排序：初始化读一次，管理弹窗关闭后重新读
     var savedBrandOrder by remember { mutableStateOf(loadBrandOrderForRecord(context)) }
     LaunchedEffect(showBrandManager) {
         if (!showBrandManager) {
@@ -122,7 +119,6 @@ fun RecordSheet(
         }
     }
 
-    // ★ 按 savedBrandOrder 排序，未列出的新品牌追加末尾
     val showAllBrands = remember(customBrands, hiddenBrands, savedBrandOrder, category) {
         val base = (Catalog.brandsOf(category) + customBrands).filter { !hiddenBrands.contains(it.name) }
         if (savedBrandOrder.isEmpty()) {
@@ -559,8 +555,6 @@ fun RecordSheet(
         }
     }
 }
-
-// ================= 辅助组件 =================
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
