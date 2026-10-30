@@ -2,7 +2,6 @@ package com.naicha.diary.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,9 +24,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.naicha.diary.DrinkApp
-import com.naicha.diary.data.AppSettings
-import com.naicha.diary.data.Drink
-import com.naicha.diary.data.DrinkRepository
+import com.naicha.diary.data.*
 import com.naicha.diary.net.DeepSeekClient
 import com.naicha.diary.ui.components.AbstinenceTracker
 import com.naicha.diary.ui.components.GradientButton
@@ -39,13 +36,24 @@ import com.naicha.diary.ui.theme.Outline
 import com.naicha.diary.ui.theme.PearlSoft
 import com.naicha.diary.ui.theme.Strawberry
 import com.naicha.diary.ui.theme.Taro
-import com.naicha.diary.util.TimeUtil
 import com.naicha.diary.util.WebDavClient
 import com.naicha.diary.util.rememberHaptics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.File
+import java.util.UUID
+
+// 👇 新增：用于 WebDAV 打包备份的数据结构
+@Serializable
+data class BackupData(
+    val drinks: List<Drink> = emptyList(),
+    val customBrands: List<Brand> = emptyList(),
+    val hiddenBrands: String = "",
+    val brandOrder: String = ""
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,10 +86,8 @@ fun SettingsContent(
     onClearAll: () -> Unit,
     showHeader: Boolean = true,
 ) {
-    // 控制是否进入第二层页面
     var showDetail by remember { mutableStateOf(false) }
     
-    // 拦截系统返回键，如果在第二层，则返回第一层
     BackHandler(enabled = showDetail) {
         showDetail = false
     }
@@ -101,15 +107,13 @@ fun SettingsContent(
         }
 
         if (!showDetail) {
-            // ================= 第一层：打卡 + 设置入口 =================
             item {
                 AbstinenceTracker(
                     modifier = Modifier.fillMaxWidth(),
-                    onOpenSettings = { showDetail = true } // 点击齿轮进入第二层
+                    onOpenSettings = { showDetail = true }
                 )
             }
         } else {
-            // ================= 第二层：设置详情页 =================
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
                     IconButton(onClick = { showDetail = false }) {
@@ -124,30 +128,15 @@ fun SettingsContent(
                 }
             }
 
-
-            // === AI 识图 ===
-            item {
-                SettingsAiCard()
-            }
-
-            // === 我的数据 ===
-            item {
-                SettingsDataCard(items, onClearAll)
-            }
-            
-            // === 关于 ===
-            item {
-                SettingsAboutCard()
-            }
+            item { SettingsAiCard() }
+            item { SettingsDataCard(items, onClearAll) }
+            item { SettingsAboutCard() }
         }
     }
 }
 
-// ============== 下面是拆分出的卡片组件 ==============
-
 @Composable
 private fun SettingsAiCard() {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
 
@@ -249,7 +238,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         Text("云端同步 (WebDAV)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(8.dp))
         
-              OutlinedTextField(
+        OutlinedTextField(
             value = url,
             onValueChange = { url = it.trim(); prefs.edit().putString("url", url).apply() },
             placeholder = { Text("WebDAV 地址 (如 https://dav.jianguoyun.com/dav/)", color = Outline) },
@@ -281,7 +270,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
             )
         }
         
-        // 👇 新增一个明确的保存按钮
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SmallButton(text = "💾 保存 WebDAV 配置") {
@@ -296,7 +284,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         }
         Spacer(Modifier.height(10.dp))
         
-        Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(modifier = Modifier.weight(1f)) {
                 GradientButton(
@@ -312,19 +299,47 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                         scope.launch {
                             withContext(Dispatchers.IO) {
                                 try {
+                                    // 1. 处理自定义品牌的图片（转 Base64）
+                                    val brandPrefs = context.getSharedPreferences("brand_store", android.content.Context.MODE_PRIVATE)
+                                    val orderPrefs = context.getSharedPreferences("naicha_brand_order_prefs", android.content.Context.MODE_PRIVATE)
+                                    val hiddenStr = brandPrefs.getString("hidden", "") ?: ""
+                                    val orderStr = orderPrefs.getString("brand_order", "") ?: ""
+                                    
+                                    val customBrandsStr = brandPrefs.getString("custom", "") ?: ""
+                                    val jsonIgnore = Json { ignoreUnknownKeys = true }
+                                    val customBrands = try { jsonIgnore.decodeFromString<List<Brand>>(customBrandsStr) } catch (e: Exception) { emptyList() }
+                                    
+                                    val brandsWithBase64 = customBrands.map { brand ->
+                                        val file = brand.logoPath?.let { File(it) }
+                                        val base64 = if (file != null && file.exists()) {
+                                            "data:image/jpeg;base64," + android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                                        } else ""
+                                        brand.copy(logoPath = base64)
+                                    }
+
+                                    // 2. 组装成 BackupData
+                                    val backup = BackupData(
+                                        drinks = items,
+                                        customBrands = brandsWithBase64,
+                                        hiddenBrands = hiddenStr,
+                                        brandOrder = orderStr
+                                    )
+                                    
                                     val json = Json { encodeDefaults = true }
-                                    val jsonStr = json.encodeToString(items)
+                                    val jsonStr = json.encodeToString(BackupData.serializer(), backup)
+                                    
+                                    // 3. 上传
                                     val res = WebDavClient.upload(url, user, pass, jsonStr.toByteArray())
                                     withContext(Dispatchers.Main) {
                                         if (res.isSuccess) {
-                                            statusMsg = "✅ 备份成功！"
+                                            statusMsg = "✅ 包含品牌与排序，备份成功！"
                                             haptics.confirm()
                                         } else {
                                             statusMsg = "❌ ${res.exceptionOrNull()?.message}"
                                         }
                                     }
                                 } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) { statusMsg = "❌ 序列化失败" }
+                                    withContext(Dispatchers.Main) { statusMsg = "❌ 备份失败: ${e.message}" }
                                 }
                             }
                             isWorking = false
@@ -353,12 +368,48 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                         try {
                                             val jsonStr = res.getOrThrow()
                                             val json = Json { ignoreUnknownKeys = true }
-                                            val restoredList = json.decodeFromString<List<Drink>>(jsonStr)
-                                            DrinkRepository(context).replaceAll(restoredList)
-                                            statusMsg = "✅ 还原成功！请重新打开 App 查看"
+                                            
+                                            // 尝试按照新格式解析
+                                            val backup = try {
+                                                json.decodeFromString(BackupData.serializer(), jsonStr)
+                                            } catch (e: Exception) {
+                                                // 兼容旧版本只有 List<Drink> 的备份
+                                                BackupData(drinks = json.decodeFromString<List<Drink>>(jsonStr))
+                                            }
+                                            
+                                            // 1. 还原饮品
+                                            DrinkRepository(context).replaceAll(backup.drinks)
+                                            
+                                            // 2. 还原品牌图片
+                                            val restoredBrands = backup.customBrands.map { brand ->
+                                                val base64 = brand.logoPath
+                                                if (base64 != null && base64.startsWith("data:image")) {
+                                                    val imageBytes = android.util.Base64.decode(base64.substringAfter(","), android.util.Base64.NO_WRAP)
+                                                    val newFile = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
+                                                    newFile.writeBytes(imageBytes)
+                                                    brand.copy(logoPath = newFile.absolutePath)
+                                                } else {
+                                                    brand
+                                                }
+                                            }
+                                            
+                                            // 3. 写回本地配置
+                                            val brandPrefs = context.getSharedPreferences("brand_store", android.content.Context.MODE_PRIVATE)
+                                            brandPrefs.edit()
+                                                .putString("custom", json.encodeToString(restoredBrands))
+                                                .putString("hidden", backup.hiddenBrands)
+                                                .apply()
+                                                
+                                            val orderPrefs = context.getSharedPreferences("naicha_brand_order_prefs", android.content.Context.MODE_PRIVATE)
+                                            orderPrefs.edit().putString("brand_order", backup.brandOrder).apply()
+                                            
+                                            // 4. 热刷新 BrandStore
+                                            BrandStore.reload(context)
+                                            
+                                            statusMsg = "✅ 饮品与品牌均还原成功！请返回主页查看"
                                             haptics.confirm()
                                         } catch (e: Exception) {
-                                            statusMsg = "❌ 数据解析失败"
+                                            statusMsg = "❌ 数据解析失败: ${e.message}"
                                         }
                                     } else {
                                         statusMsg = "❌ ${res.exceptionOrNull()?.message}"
@@ -425,11 +476,6 @@ private fun SettingsAboutCard() {
         }
     }
 }
-
-// 👇 下面是补全的成就勋章和连续天数计算
-
-
-
 
 @Composable
 private fun SmallButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
