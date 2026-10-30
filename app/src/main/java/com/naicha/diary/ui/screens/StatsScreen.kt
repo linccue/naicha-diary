@@ -2,7 +2,6 @@ package com.naicha.diary.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -74,7 +74,6 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
             }
 
             if (total > 0) {
-                // 👇 新增：品类分布
                 item {
                     StatsCard {
                         SectionHeader(title = "品类分布", subtitle = "喝了些什么")
@@ -83,10 +82,13 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                     }
                 }
 
-                // 👇 新增：品牌墙点亮
                 item {
                     StatsCard {
-                        SectionHeader(title = "品牌墙点亮", subtitle = "解锁你的品牌图鉴")
+                        val unlockedCount = remember(items) { 
+                            val unlocked = items.map { it.brand }.toSet()
+                            Catalog.brands.take(20).count { unlocked.contains(it.name) }
+                        }
+                        SectionHeader(title = "品牌墙点亮", subtitle = "已点亮 $unlockedCount/20 个品牌")
                         Spacer(Modifier.height(20.dp))
                         BrandWall(items = items)
                     }
@@ -119,6 +121,7 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
     }
 }
 
+// ================= 全新设计：正圆环 + 两列图例 =================
 @Composable
 private fun CategoryDistribution(items: List<Drink>) {
     val categoryData = remember(items) {
@@ -127,69 +130,86 @@ private fun CategoryDistribution(items: List<Drink>) {
     val total = categoryData.sumOf { it.second }.coerceAtLeast(1)
     val palette = listOf(Caramel, Taro, Matcha, Strawberry, Sky, Color(0xFFF2B04A), Color(0xFFB08968), Color(0xFF95A5A6), Color(0xFF8E44AD))
 
-    Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = size.minDimension * 0.18f
-            val inset = stroke / 2f
-            var startAngle = -90f
-            categoryData.forEachIndexed { index, entry ->
-                val sweep = entry.second.toFloat() / total * 360f
-                drawArc(
-                    color = palette[index % palette.size],
-                    startAngle = startAngle + 1.6f,
-                    sweepAngle = (sweep - 3.2f).coerceAtLeast(0.6f),
-                    useCenter = false,
-                    topLeft = Offset(inset, inset),
-                    size = Size(size.width - stroke, size.height - stroke),
-                    style = Stroke(width = stroke, cap = StrokeCap.Butt)
-                )
-                startAngle += sweep
-            }
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("${total}杯", style = MaterialTheme.typography.headlineMedium, color = Color.Black, fontWeight = FontWeight.Bold)
-        }
-    }
-    
-    Spacer(Modifier.height(20.dp))
-    
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        categoryData.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                row.forEachIndexed { index, entry ->
-                    val actualIndex = categoryData.indexOf(entry)
-                    val color = palette[actualIndex % palette.size]
-                    val percent = (entry.second.toFloat() / total * 100).toInt()
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFFF8F9FA))
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(color))
-                            Spacer(Modifier.width(6.dp))
-                            Text(entry.first.label, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-                        }
-                        Text("${percent}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.Black)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        // 固定尺寸画布，保证画出来的是正圆
+        Box(modifier = Modifier.size(180.dp), contentAlignment = Alignment.Center) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val stroke = size.minDimension * 0.15f // 环的粗细，参考图二
+                val inset = stroke / 2f
+                var startAngle = -90f
+
+                if (categoryData.size == 1) {
+                    drawArc(
+                        color = palette[0],
+                        startAngle = startAngle + 2f,
+                        sweepAngle = 360f - 4f,
+                        useCenter = false,
+                        topLeft = Offset(inset, inset),
+                        size = Size(size.width - stroke, size.height - stroke),
+                        style = Stroke(width = stroke, cap = StrokeCap.Butt)
+                    )
+                } else {
+                    categoryData.forEachIndexed { index, entry ->
+                        val sweep = entry.second.toFloat() / total * 360f
+                        drawArc(
+                            color = palette[index % palette.size],
+                            startAngle = startAngle + 1.6f,
+                            sweepAngle = (sweep - 3.2f).coerceAtLeast(0.6f),
+                            useCenter = false,
+                            topLeft = Offset(inset, inset),
+                            size = Size(size.width - stroke, size.height - stroke),
+                            style = Stroke(width = stroke, cap = StrokeCap.Butt)
+                        )
+                        startAngle += sweep
                     }
                 }
-                if (row.size < 2) Spacer(Modifier.weight(1f))
+            }
+            Text("${total}杯", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
+        }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        // 两列图例
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            categoryData.chunked(2).forEach { rowItems ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    rowItems.forEachIndexed { index, entry ->
+                        val actualIndex = categoryData.indexOf(entry)
+                        val color = palette[actualIndex % palette.size]
+                        val percent = (entry.second.toFloat() / total * 100).toInt()
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFF8F9FA))
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(color))
+                                Spacer(Modifier.width(6.dp))
+                                Text(entry.first.label, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                            }
+                            Text("${percent}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.Black)
+                        }
+                    }
+                    if (rowItems.size < 2) Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
     }
 }
 
+// ================= 全新设计：限制20个点，5x4排列 =================
 @Composable
 private fun BrandWall(items: List<Drink>) {
     val unlockedBrands = remember(items) { items.map { it.brand }.toSet() }
-    val allBrands = Catalog.brands
+    // 只取前 20 个品牌进行展示，防止卡片无限变高
+    val displayBrands = remember { Catalog.brands.take(20) }
     
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        allBrands.chunked(5).forEach { row ->
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+        displayBrands.chunked(5).forEach { row ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 row.forEach { brand ->
                     val isUnlocked = unlockedBrands.contains(brand.name)
