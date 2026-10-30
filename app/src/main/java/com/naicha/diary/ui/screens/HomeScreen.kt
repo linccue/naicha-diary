@@ -326,7 +326,6 @@ fun HomeScreen(
                     SoftCard {
                         SectionHeader(title = "成就勋章", subtitle = "解锁你的饮品成就")
                         Spacer(Modifier.height(14.dp))
-                        // 这里只调用一次
                         Achievements(items = items, streak = currentStreak(items))
                     }
                     Spacer(Modifier.height(40.dp))
@@ -434,7 +433,7 @@ private fun EmptyHint(onRecord: () -> Unit) {
     }
 }
 
-// 成就勋章组件（只保留这一个）
+// 成就勋章组件
 @Composable
 private fun Achievements(items: List<Drink>, streak: Int) {
     val brandCount = items.map { it.brand }.distinct().size
@@ -477,7 +476,7 @@ private fun Achievements(items: List<Drink>, streak: Int) {
     }
 }
 
-// 连续天数计算（只保留这一个）
+// 连续天数计算
 private fun currentStreak(items: List<Drink>): Int {
     if (items.isEmpty()) return 0
     val days = items.map { TimeUtil.startOfDay(it.timestamp) }.toHashSet()
