@@ -4,6 +4,7 @@ import com.naicha.diary.R
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 enum class DrinkCategory(val label: String, val badge: String, val accent: Long) {
@@ -61,6 +62,8 @@ data class Drink(
     }
 }
 
+// 👇 必须加上 @Serializable 才能存入本地
+@Serializable
 data class Brand(
     val name: String,
     val category: DrinkCategory,
@@ -174,6 +177,7 @@ object Catalog {
     fun iceLabel(category: DrinkCategory): String = "冰量 / 温度"
     fun extraLabel(category: DrinkCategory): String = "加料"
 }
+
 object BrandStore {
     private var prefs: android.content.SharedPreferences? = null
     private val _customBrands = MutableStateFlow<List<Brand>>(emptyList())
