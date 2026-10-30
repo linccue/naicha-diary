@@ -1,13 +1,6 @@
 package com.naicha.diary.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -63,7 +55,7 @@ fun HomeScreen(
     onAiRecord: () -> Unit,
     onOpenWall: () -> Unit,
     onOpenDetail: (Drink) -> Unit,
-    onOpenProfile: () -> Unit,
+    onOpenProfile: () -> Unit, // 👈 接收跳转头像的点击事件
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -106,8 +98,14 @@ fun HomeScreen(
     }
     val monthCount = monthItems.size
     val monthSpend = monthItems.sumOf { it.price }
-    // 计算本月平均花费
-    val avgSpend = if (monthCount == 0) 0.0 else monthSpend / monthCount
+    
+    // 计算本周记录
+    val weekItemsCount = remember(items) {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
+        items.count { it.timestamp >= cal.timeInMillis }
+    }
 
     val processedItems = remember(items, selectedCategory, sortOrder, searchQuery, activeQuickFilter) {
         var result = items
@@ -184,21 +182,20 @@ fun HomeScreen(
                             color = Color.Black
                         )
                     }
-                    // 右侧头像
-                     Box(modifier = Modifier.clip(CircleShape).clickable { onOpenProfile() }) {
-                    Image(
-                        painter = painterResource(id = R.drawable.girl_avatar),
-                        contentDescription = "头像",
-                        modifier = Modifier.size(64.dp).clip(CircleShape).border(1.dp, Color(0xFFE0E0E0), CircleShape)
-                    )
+                    // 👇 右侧头像增加点击事件
+                    Box(modifier = Modifier.clip(CircleShape).clickable { onOpenProfile() }) {
+                        Image(
+                            painter = painterResource(id = R.drawable.girl_avatar),
+                            contentDescription = "头像",
+                            modifier = Modifier.size(64.dp).clip(CircleShape).border(1.dp, Color(0xFFE0E0E0), CircleShape)
+                        )
+                    }
                 }
             }
 
-           
-                         // 2. 三块数据统计卡片
+            // 2. 三块数据统计卡片
             item {
                 Row(
-                    // 👇 高度从 160.dp 增加到 172.dp，给底部数字留足空间
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(172.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -207,45 +204,17 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 14.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            Text(
-                                text = "本月已喝", 
-                                fontSize = 13.sp, 
-                                color = Color(0xFF888888), 
-                                fontWeight = FontWeight.Medium
-                            )
-                            
+                            Text(text = "本月已喝", fontSize = 13.sp, color = Color(0xFF888888), fontWeight = FontWeight.Medium)
                             Spacer(Modifier.height(4.dp))
-                            
                             Row(verticalAlignment = Alignment.Bottom) {
-                                Text(
-                                    text = "$monthCount", 
-                                    fontSize = 44.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = Color.Black,
-                                    lineHeight = 44.sp // 👈 压缩行高
-                                )
+                                Text(text = "$monthCount", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.Black, lineHeight = 44.sp)
                                 Spacer(Modifier.width(4.dp))
-                                Text(
-                                    text = "杯", 
-                                    fontSize = 16.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = Color.Black,
-                                    modifier = Modifier.padding(bottom = 6.dp)
-                                )
+                                Text(text = "杯", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(bottom = 6.dp))
                             }
-                            
                             Spacer(Modifier.weight(1f))
-                            
                             // 底部灰色胶囊标签
-                            Box(
-                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 5.dp)
-                            ) {
-                                Text(
-                                    text = "总记录数量：$totalCount", 
-                                    fontSize = 11.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = Color.Black
-                                )
+                            Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 5.dp)) {
+                                Text(text = "总记录数量：$totalCount", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
                         }
                         // 背景透明杯子水印
@@ -263,73 +232,38 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         // 右侧上：本月花费
-                        Box(
-                            modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.SpaceBetween // 👈 自动把标题推顶，数字推底
-                            ) {
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
                                 Text(text = "本月花费", fontSize = 13.sp, color = Color(0xFF888888), fontWeight = FontWeight.Medium)
-                                Text(
-                                    text = "¥${formatMoney(monthSpend)}", 
-                                    fontSize = 24.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = Color.Black,
-                                    lineHeight = 26.sp // 👈 限制行高，防止被切
-                                )
+                                Text(text = "¥${formatMoney(monthSpend)}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black, lineHeight = 26.sp)
                             }
                         }
                         
                         Spacer(Modifier.height(12.dp))
                         
                         // 右侧下：平均花费
-                        Box(
-                            modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.SpaceBetween // 👈 自动把标题推顶，数字推底
-                            ) {
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color.White).padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
                                 Text(text = "平均花费", fontSize = 13.sp, color = Color(0xFF888888), fontWeight = FontWeight.Medium)
-                                Text(
-                                    text = "¥${formatMoney(avgSpend)}", 
-                                    fontSize = 24.sp, 
-                                    fontWeight = FontWeight.Bold, 
-                                    color = Color.Black,
-                                    lineHeight = 26.sp // 👈 限制行高，防止被切
-                                )
+                                Text(text = "¥${formatMoney(if (monthCount > 0) monthSpend / monthCount else 0.0)}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Black, lineHeight = 26.sp)
                             }
                         }
                     }
                 }
             }
 
-            // 4. 最近喝过标题与过滤
+            // 3. 最近喝过标题与过滤
             item {
                 Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "最近喝过",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
+                        Text(text = "最近喝过", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                         Spacer(Modifier.weight(1f))
                         
-                        IconCircleButton(
-                            icon = { Icon(Icons.Default.Menu, "分类", tint = if (showCategory) Color.White else Color.Black) },
-                            isActive = showCategory,
-                            onClick = { showCategory = !showCategory; if (showCategory) showSearch = false }
-                        )
+                        IconCircleButton(icon = { Icon(Icons.Default.Menu, "分类", tint = if (showCategory) Color.White else Color.Black) }, isActive = showCategory, onClick = { showCategory = !showCategory; if (showCategory) showSearch = false })
                         Spacer(Modifier.width(8.dp))
                         
                         Box {
-                            IconCircleButton(
-                                icon = { Text("⇅", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (showSortMenu) Color.White else Color.Black) },
-                                isActive = showSortMenu,
-                                onClick = { showSortMenu = true }
-                            )
+                            IconCircleButton(icon = { Text("⇅", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (showSortMenu) Color.White else Color.Black) }, isActive = showSortMenu, onClick = { showSortMenu = true })
                             DropdownMenu(
                                 expanded = showSortMenu, onDismissRequest = { showSortMenu = false },
                                 containerColor = Color.Transparent, tonalElevation = 0.dp, shadowElevation = 0.dp, modifier = Modifier.background(Color.Transparent)
@@ -348,11 +282,7 @@ fun HomeScreen(
                         }
                         Spacer(Modifier.width(8.dp))
                         
-                        IconCircleButton(
-                            icon = { Icon(Icons.Default.Search, "搜索", tint = if (showSearch) Color.White else Color.Black) },
-                            isActive = showSearch,
-                            onClick = { showSearch = !showSearch; if (!showSearch) { searchQuery = ""; activeQuickFilter = null }; if (showSearch) showCategory = false }
-                        )
+                        IconCircleButton(icon = { Icon(Icons.Default.Search, "搜索", tint = if (showSearch) Color.White else Color.Black) }, isActive = showSearch, onClick = { showSearch = !showSearch; if (!showSearch) { searchQuery = ""; activeQuickFilter = null }; if (showSearch) showCategory = false })
                     }
                     
                     AnimatedVisibility(visible = showCategory) {
@@ -384,7 +314,7 @@ fun HomeScreen(
                 }
             }
 
-            // 5. 列表
+            // 4. 列表
             if (processedItems.isEmpty()) {
                 item { EmptyHint(onRecord = onRecord) }
             } else {
@@ -395,8 +325,6 @@ fun HomeScreen(
         }
     }
 }
-
-// ================= 其他保留的组件 =================
 
 @Composable
 private fun IconCircleButton(icon: @Composable () -> Unit, isActive: Boolean, onClick: () -> Unit) {
@@ -427,7 +355,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                         }
                         if (bitmap != null) {
                             val imageBitmap = bitmap.asImageBitmap()
-                            Canvas(modifier = Modifier.fillMaxSize()) {
+                            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
                                 val imgWidth = imageBitmap.width.toFloat()
                                 val imgHeight = imageBitmap.height.toFloat()
                                 val canvasRatio = size.width / size.height
