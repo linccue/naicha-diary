@@ -2,6 +2,8 @@ package com.naicha.diary.data
 
 import com.naicha.diary.R
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.util.UUID
 
 enum class DrinkCategory(val label: String, val badge: String, val accent: Long) {
@@ -64,7 +66,10 @@ data class Brand(
     val category: DrinkCategory,
     val color: Long,
     val badge: String,
-    val logo: Int
+    val logo: Int = 0,
+    val logoPath: String? = null, // 自定义图片路径
+    val isHidden: Boolean = false, // 是否隐藏
+    val isCircle: Boolean = true // 裁剪形状
 )
 
 object Catalog {
@@ -168,4 +173,39 @@ object Catalog {
     fun sugarLabel(category: DrinkCategory): String = "糖度"
     fun iceLabel(category: DrinkCategory): String = "冰量 / 温度"
     fun extraLabel(category: DrinkCategory): String = "加料"
+}
+object BrandStore {
+    private var prefs: android.content.SharedPreferences? = null
+    private val _customBrands = MutableStateFlow<List<Brand>>(emptyList())
+    val customBrands: StateFlow<List<Brand>> = _customBrands.asStateFlow()
+    private val _hiddenBrands = MutableStateFlow<Set<String>>(emptySet())
+    val hiddenBrands: StateFlow<Set<String>> = _hiddenBrands.asStateFlow()
+
+    fun init(context: android.content.Context) {
+        if (prefs != null) return
+        prefs = context.getSharedPreferences("brand_store", android.content.Context.MODE_PRIVATE)
+        val gson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        
+        val customStr = prefs?.getString("custom", "") ?: ""
+        if (customStr.isNotEmpty()) {
+            try { _customBrands.value = gson.decodeFromString(customStr) } catch (e: Exception) {}
+        }
+        
+        val hiddenStr = prefs?.getString("hidden", "") ?: ""
+        if (hiddenStr.isNotEmpty()) {
+            _hiddenBrands.value = hiddenStr.split(",").toSet()
+        }
+    }
+
+    fun addBrand(context: android.content.Context, brand: Brand) {
+        _customBrands.value = _customBrands.value + brand
+        prefs?.edit()?.putString("custom", kotlinx.serialization.json.Json.encodeToString(_customBrands.value))?.apply()
+    }
+
+    fun toggleHide(context: android.content.Context, names: Set<String>, hide: Boolean) {
+        val current = _hiddenBrands.value.toMutableSet()
+        if (hide) current.addAll(names) else current.removeAll(names)
+        _hiddenBrands.value = current
+        prefs?.edit()?.putString("hidden", current.joinToString(","))?.apply()
+    }
 }
