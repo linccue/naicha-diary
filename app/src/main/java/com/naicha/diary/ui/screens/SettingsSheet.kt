@@ -455,11 +455,20 @@ private fun SettingsAboutCard() {
     val context = LocalContext.current
     val crash = remember { DrinkApp.lastCrash(context) }
 
+    // 👇 动态获取真实的版本号
+    val versionName = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
+        } catch (e: Exception) {
+            "未知版本"
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SoftCard {
             SectionHeader(title = "关于", subtitle = "饮品日记")
             Spacer(Modifier.height(10.dp))
-            InfoLine("版本", "1.1.0")
+            InfoLine("版本", versionName) // 👈 使用动态变量
             InfoLine("AI 模型", "deepseek-flash（视觉）")
             InfoLine("数据存储", "本机文件，不上传")
             InfoLine("玻璃材质", "chrisbanes/haze")
@@ -476,7 +485,6 @@ private fun SettingsAboutCard() {
         }
     }
 }
-
 @Composable
 private fun SmallButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
