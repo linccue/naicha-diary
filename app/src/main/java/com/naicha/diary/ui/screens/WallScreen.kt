@@ -109,6 +109,8 @@ fun WallScreen(
     onOpenDetail: (Drink) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+        val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
+    val hiddenBrands by com.naicha.diary.data.BrandStore.hiddenBrands.collectAsState()
     var mode by remember { mutableStateOf(WallMode.Wall) }
     var showPoster by remember { mutableStateOf(false) }
 
