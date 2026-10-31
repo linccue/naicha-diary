@@ -132,7 +132,7 @@ fun SettingsContent(
 private fun SettingsAiCard() {
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
-
+        var showRestoreMenu by remember { mutableStateOf(false) } // 👈 弹出菜单开关
     var apiKey by remember { mutableStateOf(AppSettings.apiKey) }
     var reveal by remember { mutableStateOf(false) }
     var testing by remember { mutableStateOf(false) }
@@ -279,7 +279,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(modifier = Modifier.weight(1f)) {
-                GradientButton(
+                 GradientButton(
                     text = if (isWorking) "处理中…" else "立即备份",
                     onClick = {
                         if (url.isBlank() || user.isBlank() || pass.isBlank()) {
@@ -320,12 +320,17 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                     
                                     val json = Json { encodeDefaults = true }
                                     val jsonStr = json.encodeToString(BackupData.serializer(), backup)
-                                    
-                                    // 3. 上传
-                                    val res = WebDavClient.upload(url, user, pass, jsonStr.toByteArray())
+                                   var index = prefs.getInt("auto_backup_index", 1)
+                                    if (index < 1 || index > 3) index = 1
+                                    val fileName = "naicha_backup_${index}.json"
+
+                                    val res = WebDavClient.upload(url, user, pass, jsonStr.toByteArray(), fileName)
                                     withContext(Dispatchers.Main) {
                                         if (res.isSuccess) {
-                                            statusMsg = "✅ 包含品牌与排序，备份成功！"
+                                            val nextIndex = if (index >= 3) 1 else index + 1
+                                            prefs.edit().putInt("auto_backup_index", nextIndex).apply()
+                                            
+                                            statusMsg = "✅ 已备份为版本 $index"
                                             haptics.confirm()
                                         } else {
                                             statusMsg = "❌ ${res.exceptionOrNull()?.message}"
@@ -350,6 +355,10 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                             statusMsg = "请先填写完整的 WebDAV 配置"
                             return@GradientButton
                         }
+                        showRestoreMenu = true // 👈 显示选择菜单
+                    },
+                    colors = listOf(Taro, Color(0xFFCBBAF5))
+                )
                         haptics.tick()
                         isWorking = true
                         statusMsg = null
@@ -465,6 +474,84 @@ private fun SettingsAboutCard() {
             InfoLine("AI 模型", "deepseek-flash（视觉）")
             InfoLine("数据存储", "本机文件，不上传")
             InfoLine("玻璃材质", "chrisbanes/haze")
+                    // 👈 新增：选择要恢复的备份版本
+        if (showRestoreMenu) {
+            AlertDialog(
+                onDismissRequest = { showRestoreMenu = false },
+                title = { Text("选择要恢复的版本") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(1, 2, 3).forEach { version ->
+                            Button(
+                                onClick = {
+                                    showRestoreMenu = false
+                                    isWorking = true
+                                    statusMsg = null
+                                    val fileName = "naicha_backup_${version}.json"
+                                    
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            val res = WebDavClient.download(url, user, pass, fileName)
+                                            withContext(Dispatchers.Main) {
+                                                if (res.isSuccess) {
+                                                    try {
+                                                        val jsonStr = res.getOrThrow()
+                                                        val json = Json { ignoreUnknownKeys = true }
+                                                        val backup = try {
+                                                            json.decodeFromString(BackupData.serializer(), jsonStr)
+                                                        } catch (e: Exception) {
+                                                            BackupData(drinks = json.decodeFromString<List<Drink>>(jsonStr))
+                                                        }
+                                                        
+                                                        DrinkRepository(context).replaceAll(backup.drinks)
+                                                        
+                                                        val restoredBrands = backup.customBrands.map { brand ->
+                                                            val base64 = brand.logoPath
+                                                            if (base64 != null && base64.startsWith("data:image")) {
+                                                                val imageBytes = android.util.Base64.decode(base64.substringAfter(","), android.util.Base64.NO_WRAP)
+                                                                val newFile = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
+                                                                newFile.writeBytes(imageBytes)
+                                                                brand.copy(logoPath = newFile.absolutePath)
+                                                            } else brand
+                                                        }
+                                                        
+                                                        val brandPrefs = context.getSharedPreferences("brand_store", Context.MODE_PRIVATE)
+                                                        brandPrefs.edit()
+                                                            .putString("custom", json.encodeToString(restoredBrands))
+                                                            .putString("hidden", backup.hiddenBrands)
+                                                            .apply()
+                                                            
+                                                        val orderPrefs = context.getSharedPreferences("naicha_brand_order_prefs", Context.MODE_PRIVATE)
+                                                        orderPrefs.edit().putString("brand_order", backup.brandOrder).apply()
+                                                        
+                                                        BrandStore.reload(context)
+                                                        
+                                                        statusMsg = "✅ 版本 $version 还原成功！"
+                                                        haptics.confirm()
+                                                    } catch (e: Exception) {
+                                                        statusMsg = "❌ 数据解析失败: ${e.message}"
+                                                    }
+                                                } else {
+                                                    statusMsg = "❌ 版本 $version 不存在或下载失败"
+                                                }
+                                            }
+                                        }
+                                        isWorking = false
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Taro)
+                            ) {
+                                Text("版本 $version")
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showRestoreMenu = false }) { Text("取消") }
+                }
+            )
+        }
         }
         
         if (crash != null) {
