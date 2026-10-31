@@ -46,14 +46,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.UUID
 
-// 👇 新增：用于 WebDAV 打包备份的数据结构
-@Serializable
-data class BackupData(
-    val drinks: List<Drink> = emptyList(),
-    val customBrands: List<Brand> = emptyList(),
-    val hiddenBrands: String = "",
-    val brandOrder: String = ""
-)
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
