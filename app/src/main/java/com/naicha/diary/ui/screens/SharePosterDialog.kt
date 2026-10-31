@@ -324,6 +324,8 @@ private fun PosterCell(tea: Drink, modifier: Modifier = Modifier) {
         } else {
             BrandLogo(
                 logo = brand.logo,
+                logoPath = brand.logoPath, // 👈 加回来
+                isCircle = brand.isCircle, // 👈 加回来
                 color = color,
                 badge = brand.badge,
                 size = 46.dp,
