@@ -190,38 +190,51 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
         item { DraggableStickerWall(items) }
 
         item {
-            CalendarCard(
-                currentMonth = currentMonth,
-                onMonthChange = { currentMonth = it; selectedDay = 1 },
-                monthItems = monthItems,
-                dayRecords = dayRecords,
-                selectedDay = selectedDay,
-                onSelectDay = { selectedDay = it }
-            )
-            // 👈 新增虚线分隔
-            Spacer(Modifier.height(16.dp))
-            DashedDivider(color = Color(0xFFE0E0E0))
-            Spacer(Modifier.height(4.dp))
-        }
+            // 👈 将日历、虚线、记录合并到同一个白色圆角大卡片中
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.White)
+            ) {
+                CalendarCard(
+                    currentMonth = currentMonth,
+                    onMonthChange = { currentMonth = it; selectedDay = 1 },
+                    monthItems = monthItems,
+                    dayRecords = dayRecords,
+                    selectedDay = selectedDay,
+                    onSelectDay = { selectedDay = it }
+                )
+                
+                // 虚线分隔
+                DashedDivider(color = Color(0xFFE0E0E0), modifier = Modifier.padding(horizontal = 20.dp))
+                
+                // 日期标题
+                val dateStr = SimpleDateFormat("d日 EEEE", Locale.CHINA).format(
+                    Calendar.getInstance().apply { set(Calendar.YEAR, year); set(Calendar.MONTH, month); set(Calendar.DAY_OF_MONTH, selectedDay) }.time
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp), 
+                    horizontalArrangement = Arrangement.SpaceBetween, 
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = dateStr, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                    Text(text = "${selectedDayRecords.size} 杯", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PearlSoft, modifier = Modifier.background(Color(0xFFF4F5F0), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
+                }
 
-        item {
-            val dateStr = SimpleDateFormat("d日 EEEE", Locale.CHINA).format(
-                Calendar.getInstance().apply { set(Calendar.YEAR, year); set(Calendar.MONTH, month); set(Calendar.DAY_OF_MONTH, selectedDay) }.time
-            )
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(text = dateStr, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                Text(text = "${selectedDayRecords.size} 杯", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PearlSoft, modifier = Modifier.background(Color(0xFFF4F5F0), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp))
-            }
-        }
-
-        if (selectedDayRecords.isEmpty()) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFFF4F5F0)), contentAlignment = Alignment.Center) {
-                    Text(text = "当天暂无记录", style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
+                // 当天的记录列表
+                if (selectedDayRecords.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                        Text(text = "当天暂无记录", style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
+                    }
+                } else {
+                    Column(modifier = Modifier.padding(bottom = 12.dp)) {
+                        selectedDayRecords.forEach { tea -> 
+                            WallStickerRow(tea = tea, onClick = { onOpenDetail(tea) })
+                        }
+                    }
                 }
             }
-        } else {
-            items(selectedDayRecords, key = { it.id }) { tea -> WallStickerRow(tea = tea, onClick = { onOpenDetail(tea) }) }
         }
     }
 }
@@ -243,7 +256,6 @@ private fun DraggableStickerWall(allItems: List<Drink>) {
     }
 
     BoxWithConstraints(
-        // 👈 修改：背景色改为 #EDEEE7
         modifier = Modifier.fillMaxWidth().height(wallHeight).clip(RoundedCornerShape(24.dp)).background(Color(0xFFEDEEE7))
     ) {
         val maxWidthPx = constraints.maxWidth.toFloat()
@@ -455,7 +467,8 @@ private fun CalendarCard(
 
     val today = Calendar.getInstance()
 
-    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.White).padding(20.dp)) {
+    // 👈 去除了自身的背景和圆角，完美融入父级白色大卡片
+    Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(text = "${year}年${month + 1}月", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Row {
@@ -514,10 +527,9 @@ private fun CalendarCard(
             }
         }
         
-        Spacer(Modifier.height(12.dp)) // 👈 原本是 16.dp，改小一点
+        Spacer(Modifier.height(12.dp))
         
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            // 👈 修改：按钮变扁
             Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).border(1.dp, Color(0xFFF0F0F0), RoundedCornerShape(50)).clickable {
                 val c = Calendar.getInstance(); onMonthChange(c); onSelectDay(c.get(Calendar.DAY_OF_MONTH))
             }.padding(horizontal = 24.dp, vertical = 5.dp)) {
@@ -537,42 +549,46 @@ private fun StatCol(label: String, value: String) {
 }
 
 @Composable
-private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
+private fun WallStickerRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val brand = Catalog.brandOf(tea.brand)
     val displayName = tea.name.ifBlank { if (tea.category == "咖啡") "神秘咖啡" else "神秘${tea.category}" }
 
-    BouncyBox(onClick = onClick) {
-        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-                StickerImage(tea = tea, modifier = Modifier.fillMaxSize())
-                Box(modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp).background(Color.White, CircleShape).padding(2.dp)) {
-                    BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, logoPath = brand.logoPath, isCircle = brand.isCircle, squircle = Catalog.isSquircle(brand.name))
+    BouncyBox(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
+                    StickerImage(tea = tea, modifier = Modifier.fillMaxSize())
+                    Box(modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp).background(Color.White, CircleShape).padding(2.dp)) {
+                        BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, logoPath = brand.logoPath, isCircle = brand.isCircle, squircle = Catalog.isSquircle(brand.name))
+                    }
                 }
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(text = tea.brand.ifBlank { "未知品牌" }, style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
-                Spacer(Modifier.height(6.dp))
-                RatingStars(rating = tea.rating, starSize = 14.dp)
-                val tags = mutableListOf<String>()
-                if (tea.sugar.isNotBlank()) tags.add(tea.sugar)
-                if (tea.ice.isNotBlank()) tags.add(tea.ice)
-                if (tea.toppings.isNotEmpty()) tags.addAll(tea.toppings)
-                if (tags.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        tags.forEach { tag ->
-                            Box(modifier = Modifier.clip(RoundedCornerShape(50)).border(0.5.dp, Color(0xFFE0E0E0), RoundedCornerShape(50)).background(Color.White).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                                Text(text = tag, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(text = tea.brand.ifBlank { "未知品牌" }, style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
+                    Spacer(Modifier.height(6.dp))
+                    RatingStars(rating = tea.rating, starSize = 14.dp)
+                    val tags = mutableListOf<String>()
+                    if (tea.sugar.isNotBlank()) tags.add(tea.sugar)
+                    if (tea.ice.isNotBlank()) tags.add(tea.ice)
+                    if (tea.toppings.isNotEmpty()) tags.addAll(tea.toppings)
+                    if (tags.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            tags.forEach { tag ->
+                                Box(modifier = Modifier.clip(RoundedCornerShape(50)).border(0.5.dp, Color(0xFFE0E0E0), RoundedCornerShape(50)).background(Color.White).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                                    Text(text = tag, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
+                                }
                             }
                         }
                     }
                 }
             }
+            // 👈 每一条记录下方加上极细的灰色分割线，完美复刻图一
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(0.5.dp).background(Color(0xFFF0F0F0)))
         }
     }
 }
@@ -718,7 +734,7 @@ private fun TimelineRow(tea: Drink, onClick: () -> Unit) {
     }
 }
 
-// 👈 新增：虚线分隔组件
+// 👈 虚线分隔组件
 @Composable
 private fun DashedDivider(modifier: Modifier = Modifier, color: Color = Color(0xFFE0E0E0)) {
     Canvas(modifier = modifier.fillMaxWidth().height(1.dp)) {
