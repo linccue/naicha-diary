@@ -418,9 +418,12 @@ private fun SpendingRankCard(items: List<Drink>) {
         items.filter { it.timestamp >= startTime }
     }
 
-    val totalSpend = filteredItems.sumOf { it.price }
-    val brandSpending = remember(filteredItems) {
-        filteredItems.groupBy { it.brand }.mapValues { entry -> entry.value.sumOf { it.price } }.toList().sortedByDescending { it.second }.take(4)
+     val brandSpending = remember(filteredItems) {
+        filteredItems.groupBy { it.brand }
+            .mapValues { entry -> entry.value.sumOf { it.price } }
+            .filter { it.value > 0 } // 👈 顺便过滤掉消费为 0 的品牌（比如只记了没写价格）
+            .toList()
+            .sortedByDescending { it.second } // 👈 移除了 take(4)
     }
 
     StatsCard {
