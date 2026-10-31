@@ -226,10 +226,10 @@ fun BrandManagerDialog(
                             val finalBitmap = cropImageToCenter(originalBitmap!!, scale, offset, frameSizePx)
                             val file = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
                             FileOutputStream(file).use { finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                            val newBrand = Brand(
+                                                        val newBrand = Brand(
                                 name = newBrandName.trim(),
                                 category = DrinkCategory.MilkTea,
-                                color = 0xFFC98A5B,
+                                color = getAverageColor(finalBitmap), // 👈 改成自动提取图片颜色
                                 badge = newBrandName.trim().take(1),
                                 logoPath = file.absolutePath,
                                 isCircle = isCircleCrop
@@ -554,4 +554,35 @@ private fun cropImageToCenter(bitmap: Bitmap, scale: Float, offset: Offset, fram
     canvas.drawBitmap(bitmap, null, android.graphics.RectF(left, top, left + baseWidth, top + baseHeight), paint)
     canvas.restore()
     return output
+    // 👇 新增：采样计算图片的平均主色调
+private fun getAverageColor(bitmap: Bitmap): Long {
+    var red = 0L
+    var green = 0L
+    var blue = 0L
+    var count = 0L
+    
+    // 为了不卡顿，用步长采样，不用遍历每一个像素
+    val stepX = (bitmap.width / 30).coerceAtLeast(1)
+    val stepY = (bitmap.height / 30).coerceAtLeast(1)
+    
+    for (x in 0 until bitmap.width step stepX) {
+        for (y in 0 until bitmap.height step stepY) {
+            val pixel = bitmap.getPixel(x, y)
+            val alpha = android.graphics.Color.alpha(pixel)
+            if (alpha > 128) { // 忽略透明边缘
+                red += android.graphics.Color.red(pixel)
+                green += android.graphics.Color.green(pixel)
+                blue += android.graphics.Color.blue(pixel)
+                count++
+            }
+        }
+    }
+    // 如果全是透明的，给个默认橘色
+    if (count == 0L) return 0xFFC98A5B
+    
+    val avgR = (red / count).toInt()
+    val avgG = (green / count).toInt()
+    val avgB = (blue / count).toInt()
+    return (0xFF000000L or (avgR.toLong() shl 16) or (avgG.toLong() shl 8) or avgB.toLong())
+}
 }
