@@ -212,7 +212,8 @@ private fun CategoryDistribution(items: List<Drink>) {
 @Composable
 private fun BrandWall(items: List<Drink>) {
     val unlockedBrands = remember(items) { items.map { it.brand }.toSet() }
-    val displayBrands = remember { Catalog.brands.take(20) }
+    val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
+val displayBrands = remember(customBrands) { Catalog.brands + customBrands }
     
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         displayBrands.chunked(5).forEach { row ->
@@ -221,12 +222,14 @@ private fun BrandWall(items: List<Drink>) {
                     val isUnlocked = unlockedBrands.contains(brand.name)
                     if (isUnlocked) {
                         BrandBadge(
-                            badge = brand.badge,
-                            color = Color(brand.color),
-                            size = 32.dp,
-                            logo = brand.logo,
-                            squircle = Catalog.isSquircle(brand.name)
-                        )
+    badge = brand.badge,
+    color = Color(brand.color),
+    size = 32.dp,
+    logo = brand.logo,
+    logoPath = brand.logoPath,  // 👈 新增
+    isCircle = brand.isCircle,  // 👈 新增
+    squircle = Catalog.isSquircle(brand.name)
+)
                     } else {
                         Box(
                             modifier = Modifier
