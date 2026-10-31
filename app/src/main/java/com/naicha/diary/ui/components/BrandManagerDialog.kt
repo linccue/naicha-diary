@@ -122,18 +122,15 @@ fun BrandManagerDialog(
     val gridState = rememberLazyGridState()
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
-    // ★ 边缘自动滚动速度（> 0 = 向下滚，< 0 = 向上滚，0 = 停止）
     var autoScrollSpeed by remember { mutableStateOf(0f) }
 
-    // ★ 拖拽中的边缘自动滚动协程（每 16ms 检查一次）
     LaunchedEffect(isSortMode) {
         if (!isSortMode) return@LaunchedEffect
         while (true) {
             val speed = autoScrollSpeed
             if (speed != 0f && draggingIndex != null) {
-                                val consumed = gridState.dispatchRawDelta(speed)
+                val consumed = gridState.dispatchRawDelta(speed)
                 if (consumed != 0f) {
-                    // 补偿网格滚动导致的 item 位置变化，让被拖 item 保持跟手
                     dragOffset += Offset(0f, consumed)
                 }
             }
@@ -226,29 +223,18 @@ fun BrandManagerDialog(
                             val finalBitmap = cropImageToCenter(originalBitmap!!, scale, offset, frameSizePx)
                             val file = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
                             FileOutputStream(file).use { finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                                                        val newBrand = Brand(
+                            
+                            // 👇 自动提取图片平均颜色
+                            val newBrand = Brand(
                                 name = newBrandName.trim(),
                                 category = DrinkCategory.MilkTea,
-                                color = getAverageColor(finalBitmap), // 👈 改成自动提取图片颜色
+                                color = getAverageColor(finalBitmap),
                                 badge = newBrandName.trim().take(1),
                                 logoPath = file.absolutePath,
                                 isCircle = isCircleCrop
                             )
-                                                        BrandStore.addBrand(context, newBrand)
                             
-                            // 👇 新增：让新添加的品牌排在第四行第一个
-                            val currentNames = orderedAllBrands.map { it.name }.toMutableList()
-                            currentNames.remove(newBrand.name) // 防重复
-                            // 第四行第一个的索引是 15 (0-4第一行, 5-9第二行, 10-14第三行, 15是第四行第一个)
-                            val targetIndex = 15
-                            if (currentNames.size >= targetIndex) {
-                                currentNames.add(targetIndex, newBrand.name)
-                            } else {
-                                // 如果总数还不到第四行，就直接追加到末尾
-                                currentNames.add(newBrand.name)
-                            }
-                            savedOrder = currentNames
-                            saveBrandOrder(context, currentNames)
+                            BrandStore.addBrand(context, newBrand)
                             cropUri = null
                             showNameInput = false
                             newBrandName = ""
@@ -356,17 +342,13 @@ fun BrandManagerDialog(
                                     BrandStore.toggleHide(context, allBrands.map { b -> b.name }.toSet(), false)
                                     showMenu = false
                                 })
-                                                                HorizontalDivider(color = Color.LightGray) // 加一条分割线
+                                HorizontalDivider(color = Color.LightGray)
                                 DropdownMenuItem(
                                     text = { Text("删除选中", color = Color.Red) },
                                     onClick = {
                                         if (selectedBrands.isNotEmpty()) {
-                                            scope.launch {
-                                                // 💡 你的 BrandStore 里删除方法可能不叫 deleteBrands
-                                                // 如果这行报错，请把 deleteBrands 换成你 BrandStore 里实际的方法名
-                                                BrandStore.deleteBrands(context, selectedBrands)
-                                                selectedBrands = emptySet()
-                                            }
+                                            BrandStore.deleteBrands(context, selectedBrands)
+                                            selectedBrands = emptySet()
                                         }
                                         showMenu = false
                                     }
@@ -415,7 +397,6 @@ fun BrandManagerDialog(
                                     val centerX = currentItem.offset.x + currentItem.size.width / 2f + dragOffset.x
                                     val centerY = currentItem.offset.y + currentItem.size.height / 2f + dragOffset.y
 
-                                    // ★ 边缘自动滚动检测
                                     val gridHeight = size.height.toFloat()
                                     val edgeZone = 80.dp.toPx()
                                     val maxSpeed = 18f
@@ -538,6 +519,37 @@ fun BrandManagerDialog(
     }
 }
 
+// ======================= 顶部级私有方法区 =======================
+
+private fun getAverageColor(bitmap: Bitmap): Long {
+    var red = 0L
+    var green = 0L
+    var blue = 0L
+    var count = 0L
+    
+    val stepX = (bitmap.width / 30).coerceAtLeast(1)
+    val stepY = (bitmap.height / 30).coerceAtLeast(1)
+    
+    for (x in 0 until bitmap.width step stepX) {
+        for (y in 0 until bitmap.height step stepY) {
+            val pixel = bitmap.getPixel(x, y)
+            val alpha = android.graphics.Color.alpha(pixel)
+            if (alpha > 128) {
+                red += android.graphics.Color.red(pixel)
+                green += android.graphics.Color.green(pixel)
+                blue += android.graphics.Color.blue(pixel)
+                count++
+            }
+        }
+    }
+    if (count == 0L) return 0xFFC98A5B
+    
+    val avgR = (red / count).toInt()
+    val avgG = (green / count).toInt()
+    val avgB = (blue / count).toInt()
+    return (0xFF000000L or (avgR.toLong() shl 16) or (avgG.toLong() shl 8) or avgB.toLong())
+}
+
 private fun cropImageToCenter(bitmap: Bitmap, scale: Float, offset: Offset, frameSizePx: Float): Bitmap {
     val output = Bitmap.createBitmap(frameSizePx.toInt(), frameSizePx.toInt(), Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(output)
@@ -554,35 +566,4 @@ private fun cropImageToCenter(bitmap: Bitmap, scale: Float, offset: Offset, fram
     canvas.drawBitmap(bitmap, null, android.graphics.RectF(left, top, left + baseWidth, top + baseHeight), paint)
     canvas.restore()
     return output
-    // 👇 新增：采样计算图片的平均主色调
-private fun getAverageColor(bitmap: Bitmap): Long {
-    var red = 0L
-    var green = 0L
-    var blue = 0L
-    var count = 0L
-    
-    // 为了不卡顿，用步长采样，不用遍历每一个像素
-    val stepX = (bitmap.width / 30).coerceAtLeast(1)
-    val stepY = (bitmap.height / 30).coerceAtLeast(1)
-    
-    for (x in 0 until bitmap.width step stepX) {
-        for (y in 0 until bitmap.height step stepY) {
-            val pixel = bitmap.getPixel(x, y)
-            val alpha = android.graphics.Color.alpha(pixel)
-            if (alpha > 128) { // 忽略透明边缘
-                red += android.graphics.Color.red(pixel)
-                green += android.graphics.Color.green(pixel)
-                blue += android.graphics.Color.blue(pixel)
-                count++
-            }
-        }
-    }
-    // 如果全是透明的，给个默认橘色
-    if (count == 0L) return 0xFFC98A5B
-    
-    val avgR = (red / count).toInt()
-    val avgG = (green / count).toInt()
-    val avgB = (blue / count).toInt()
-    return (0xFF000000L or (avgR.toLong() shl 16) or (avgG.toLong() shl 8) or avgB.toLong())
-}
 }
