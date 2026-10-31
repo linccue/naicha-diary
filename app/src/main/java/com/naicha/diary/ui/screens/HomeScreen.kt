@@ -59,7 +59,6 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    // 👈 核心修复：确保每次进入首页，都重新读取一次品牌数据
     LaunchedEffect(Unit) { BrandStore.init(context) }
     
     val customBrands by BrandStore.customBrands.collectAsState()
@@ -397,18 +396,37 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                 }
                 Spacer(Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // 👈 1. 名字去掉 weight，让它能自适应宽度
-                        Text(text = displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        // 👈 1. 名字加上 weight(1f, fill=false)，空间不够时自动省略，绝不挤压后面的内容
+                        Text(
+                            text = displayName, 
+                            style = MaterialTheme.typography.titleMedium, 
+                            color = MaterialTheme.colorScheme.onSurface, 
+                            fontWeight = FontWeight.Bold, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false) 
+                        )
                         Spacer(Modifier.width(6.dp))
                         
                         // 👈 2. 星级紧贴名字右边
                         RatingStars(rating = tea.rating, starSize = 14.dp)
                         
-                        // 👈 3. 日期推到最右边
+                        // 👈 3. 日期推到最右边，强制单行、去空格
                         Spacer(Modifier.weight(1f))
-                        Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF4F5F0)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                            Text(text = TimeUtil.dayLabel(tea.timestamp), style = MaterialTheme.typography.labelSmall, color = PearlSoft)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(Color(0xFFF4F5F0))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = TimeUtil.dayLabel(tea.timestamp).replace(" ", "").replace("\n", ""), 
+                                style = MaterialTheme.typography.labelSmall, 
+                                color = PearlSoft,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                         }
                     }
                     Spacer(Modifier.height(2.dp))
