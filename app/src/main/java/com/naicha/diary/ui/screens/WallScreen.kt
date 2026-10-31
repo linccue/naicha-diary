@@ -10,10 +10,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -29,22 +25,24 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,10 +59,10 @@ import com.naicha.diary.ui.components.*
 import com.naicha.diary.ui.theme.*
 import com.naicha.diary.util.PhotoStore
 import com.naicha.diary.util.TimeUtil
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -109,7 +107,7 @@ fun WallScreen(
     onOpenDetail: (Drink) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-        val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
+    val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
     val hiddenBrands by com.naicha.diary.data.BrandStore.hiddenBrands.collectAsState()
     var mode by remember { mutableStateOf(WallMode.Wall) }
     var showPoster by remember { mutableStateOf(false) }
@@ -234,7 +232,6 @@ private fun DraggableStickerWall(allItems: List<Drink>) {
     val density = LocalDensity.current
     val nodes = remember { mutableStateListOf<StickerNode>() }
 
-    // 删除旧的节点
     LaunchedEffect(targetItems) {
         val currentIds = targetItems.map { it.id }.toSet()
         nodes.removeAll { it.tea.id !in currentIds }
@@ -255,30 +252,22 @@ private fun DraggableStickerWall(allItems: List<Drink>) {
 
             if (newItems.isNotEmpty()) {
                 newItems.forEach { tea ->
-                    // 👇 核心算法：尝试最多 100 次随机位置，直到找到一个不重叠的地方
                     var placed = false
                     var attempts = 0
                     val random = Random(tea.id.hashCode() + System.currentTimeMillis().toInt())
 
                     while (!placed && attempts < 100) {
-                        // 减去 cardSizePx，确保贴纸不会超出卡片边界
                         val randomX = random.nextFloat() * (maxWidthPx - cardSizePx)
                         val randomY = random.nextFloat() * (maxHeightPx - cardSizePx)
-
-                        // 检查是否和其他贴纸太近（乘以 0.85 留出一点间距，但不至于太远）
                         val isOverlapping = nodes.any { 
                             abs(randomX - it.offsetX) < cardSizePx * 0.85f && abs(randomY - it.offsetY) < cardSizePx * 0.85f 
                         }
-
                         if (!isOverlapping) {
-                            // 找到空位了，放入节点
                             nodes.add(StickerNode(tea, randomX, randomY, random.nextFloat() * 30f - 15f))
                             placed = true
                         }
                         attempts++
                     }
-                    
-                    // 如果真的全满了（极少情况），那就强行随便塞一个
                     if (!placed) {
                         val randomX = random.nextFloat() * (maxWidthPx - cardSizePx)
                         val randomY = random.nextFloat() * (maxHeightPx - cardSizePx)
@@ -317,7 +306,7 @@ private fun DraggableStickerItem(
 
     LaunchedEffect(node.offsetY) {
         if (!node.hasAnimated && node.offsetY > 0f) {
-            kotlinx.coroutines.delay(index * 120L)
+            delay(index * 120L)
             animY.animateTo(node.offsetY, tween(1200, easing = FastOutSlowInEasing))
             node.hasAnimated = true
         } else if (node.hasAnimated && !node.isDragging) {
@@ -391,7 +380,6 @@ private fun DraggableStickerItem(
 fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
     val customBitmap = remember(tea) { if (tea.photoPath != null) StickerImageCache.getImage(tea) else null }
     
-    // 如果 customBitmap 读到了，就画带白边的 Bitmap
     if (customBitmap != null) {
         Canvas(modifier = modifier) {
             val imgWidth = customBitmap.width.toFloat()
@@ -428,7 +416,6 @@ fun StickerImage(tea: Drink, modifier: Modifier = Modifier) {
             )
         }
     } else {
-        // 👇 如果读不到图（比如刚重启），直接降级为普通的预设图片，保证 100% 显示！
         Image(
             painter = painterResource(id = getDrinkIconRes(tea)),
             contentDescription = null,
@@ -510,7 +497,7 @@ private fun CalendarCard(
                             Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(if (isSelected) Color(0xFFF0F0F0) else Color.Transparent).clickable { onSelectDay(day) }, contentAlignment = Alignment.Center) {
                                 if (!drinks.isNullOrEmpty()) {
                                     val brand = Catalog.brandOf(drinks.first().brand)
-                                    BrandBadge(badge = brand.badge, color = Color(brand.color), size = 32.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
+                                    BrandBadge(badge = brand.badge, color = Color(brand.color), size = 32.dp, logo = brand.logo, logoPath = brand.logoPath, isCircle = brand.isCircle, squircle = Catalog.isSquircle(brand.name))
                                 } else {
                                     Text(text = day.toString(), style = MaterialTheme.typography.titleMedium, color = if (isToday) Caramel else MaterialTheme.colorScheme.onSurface, fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal)
                                 }
@@ -552,7 +539,7 @@ private fun WallStickerRow(tea: Drink, onClick: () -> Unit) {
             Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
                 StickerImage(tea = tea, modifier = Modifier.fillMaxSize())
                 Box(modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp).background(Color.White, CircleShape).padding(2.dp)) {
-                    BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
+                    BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, logoPath = brand.logoPath, isCircle = brand.isCircle, squircle = Catalog.isSquircle(brand.name))
                 }
             }
             Spacer(Modifier.width(16.dp))
@@ -610,7 +597,7 @@ private fun BrandRank(items: List<Drink>) {
             val color = Color(brand.color)
             SoftCard(elevation = 4.dp, shadowColor = color) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    BrandBadge(badge = brand.badge, color = color, size = 46.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
+                    BrandBadge(badge = brand.badge, color = color, size = 46.dp, logo = brand.logo, logoPath = brand.logoPath, isCircle = brand.isCircle, squircle = Catalog.isSquircle(brand.name))
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -703,7 +690,7 @@ private fun TimelineRow(tea: Drink, onClick: () -> Unit) {
                 LocalPhoto(file = PhotoStore.fileOf(tea.photoPath), modifier = Modifier.size(54.dp).clip(MaterialTheme.shapes.medium), maxSize = 320)
                 Spacer(Modifier.width(12.dp))
             } else {
-                BrandBadge(badge = brand.badge, color = color, size = 40.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
+                BrandBadge(badge = brand.badge, color = color, size = 40.dp, logo = brand.logo, logoPath = brand.logoPath, isCircle = brand.isCircle, squircle = Catalog.isSquircle(brand.name))
                 Spacer(Modifier.width(12.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
