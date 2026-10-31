@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.naicha.diary.R
+import com.naicha.diary.data.BrandStore
 import com.naicha.diary.data.Catalog
 import com.naicha.diary.data.Drink
 import com.naicha.diary.data.DrinkCategory
@@ -58,8 +59,11 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
-    val hiddenBrands by com.naicha.diary.data.BrandStore.hiddenBrands.collectAsState()
+    // 👈 核心修复：确保每次进入首页，都重新读取一次品牌数据
+    LaunchedEffect(Unit) { BrandStore.init(context) }
+    
+    val customBrands by BrandStore.customBrands.collectAsState()
+    val hiddenBrands by BrandStore.hiddenBrands.collectAsState()
     
     var showCategory by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
@@ -394,13 +398,15 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                 Spacer(Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Spacer(Modifier.width(8.dp))
+                        // 👈 1. 名字去掉 weight，让它能自适应宽度
+                        Text(text = displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.width(6.dp))
                         
-                        // 👈 星级放到名字后面
+                        // 👈 2. 星级紧贴名字右边
                         RatingStars(rating = tea.rating, starSize = 14.dp)
-                        Spacer(Modifier.width(8.dp))
                         
+                        // 👈 3. 日期推到最右边
+                        Spacer(Modifier.weight(1f))
                         Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF4F5F0)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                             Text(text = TimeUtil.dayLabel(tea.timestamp), style = MaterialTheme.typography.labelSmall, color = PearlSoft)
                         }
@@ -408,10 +414,27 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     Spacer(Modifier.height(2.dp))
                     Text(text = tea.brand.ifBlank { "未知品牌" }, style = MaterialTheme.typography.bodyMedium, color = PearlSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     
-                    // 👈 评价显示在品牌下面
+                    // 👈 4. 评价标签渲染（带 Emoji 和好坏颜色）
                     if (tea.note.isNotBlank()) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(text = tea.note, style = MaterialTheme.typography.labelSmall, color = PearlSoft.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(6.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            tea.note.split(" ").filter { it.isNotBlank() }.forEach { tag ->
+                                val (emoji, isGood) = getTagInfo(tag)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(if (isGood) Color(0xFFD4F647) else Color(0xFFFDF2F0))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "$emoji $tag",
+                                        color = if (isGood) Color.Black else Color(0xFFB80509),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
                     }
                     
                     Spacer(Modifier.height(6.dp))
@@ -534,5 +557,28 @@ fun getDrinkIconRes(tea: Drink): Int {
         DrinkCategory.Bottled -> R.drawable.drink_bottle
         DrinkCategory.Alcohol -> R.drawable.drink_alcohol
         else -> R.drawable.drink_general
+    }
+}
+
+// 👈 获取标签的 emoji 和 类型
+fun getTagInfo(tag: String): Pair<String, Boolean> {
+    val goodTags = mapOf(
+        "清爽" to "🍃", "果肉多" to "🍓", "果味自然" to "🍎", "喝着开心" to "😋",
+        "果味清甜" to "🍇", "越喝越甜" to "🍯", "甜得明显" to "🍬", "解馋" to "🤤",
+        "会回购" to "🛒", "刚刚好" to "👌", "性价比高" to "💰", "甜得自然" to "🌿",
+        "顺口" to "😌", "有记忆点" to "🧠", "口感丰富" to "🌈", "茶底厚" to "🍵",
+        "不甜" to "🧊", "第一口惊艳" to "✨", "顺滑" to "🧴", "没负担" to "🪶",
+        "奶味轻" to "🥛", "有奶香" to "🐄"
+    )
+    val badTags = mapOf(
+        "喝到后面腻" to "🤢", "不想再喝" to "🙅", "有负担" to "🏋️", "厚重" to "🪨",
+        "甜奶感" to "🍮", "容易喝完" to "💨", "不会专门买" to "🚫", "有点腻" to "😖",
+        "价格不值" to "💸", "睡前慎点" to "🌙", "喝完口渴" to "🥵", "寡淡" to "💧",
+        "越喝越普通" to "📉", "没记忆点" to "❓"
+    )
+    return when {
+        goodTags.containsKey(tag) -> goodTags[tag]!! to true
+        badTags.containsKey(tag) -> badTags[tag]!! to false
+        else -> "🏷" to true
     }
 }
