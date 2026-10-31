@@ -238,7 +238,7 @@ private fun DraggableStickerWall(allItems: List<Drink>) {
     }
 
     BoxWithConstraints(
-        modifier = Modifier.fillMaxWidth().height(wallHeight).clip(RoundedCornerShape(24.dp)).background(Color(0xFFE6E8E0))
+        modifier = Modifier.fillMaxWidth().height(wallHeight).clip(RoundedCornerShape(24.dp)).background(Color(0xFFEDEEE7))
     ) {
         val maxWidthPx = constraints.maxWidth.toFloat()
         val maxHeightPx = constraints.maxHeight.toFloat()
