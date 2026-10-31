@@ -206,6 +206,8 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
     
     var confirmClear by remember { mutableStateOf(false) }
     var showRestoreMenu by remember { mutableStateOf(false) } // 👈 控制选择备份的弹窗
+        var fileTimes by remember { mutableStateOf<Map<Int, String>>(emptyMap()) } // 存储时间
+    var isFetchingTimes by remember { mutableStateOf(false) } // 是否正在获取时间
     
     val prefs = remember { context.getSharedPreferences("webdav_prefs", android.content.Context.MODE_PRIVATE) }
     var url by remember { mutableStateOf(prefs.getString("url", "") ?: "") }
@@ -384,21 +386,48 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
             colors = if (confirmClear) listOf(Color(0xFFE53935), Color(0xFFEF5350)) else listOf(Strawberry, Color(0xFFFFB3C6)),
         )
     }
-
+    // 👈 当弹窗打开时，后台拉取 3 个文件的修改时间
+    LaunchedEffect(showRestoreMenu) {
+        if (showRestoreMenu) {
+            isFetchingTimes = true
+            fileTimes = emptyMap()
+            scope.launch(Dispatchers.IO) {
+                val times = mutableMapOf<Int, String>()
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.CHINA)
+                for (i in 1..3) {
+                    val res = WebDavClient.getLastModified(url, user, pass, "naicha_backup_$i.json")
+                    if (res.isSuccess && res.getOrNull()!! > 0L) {
+                        times[i] = sdf.format(java.util.Date(res.getOrNull()!!))
+                    } else {
+                        times[i] = "无备份"
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    fileTimes = times
+                    isFetchingTimes = false
+                }
+            }
+        }
+    }
     // 👈 新增：选择要恢复的备份版本弹窗
+      // 👈 新增：选择要恢复的备份版本弹窗
     if (showRestoreMenu) {
         AlertDialog(
             onDismissRequest = { showRestoreMenu = false },
-            title = { Text("选择要恢复的版本") },
+            title = { Text("选择要恢复的备份") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(1, 2, 3).forEach { version ->
+                        val fileName = "naicha_backup_${version}.json"
+                        val timeStr = fileTimes[version] ?: "加载中…"
+                        
                         Button(
                             onClick = {
+                                if (timeStr == "无备份") return@Button // 没有备份不让点
+                                
                                 showRestoreMenu = false
                                 isWorking = true
                                 statusMsg = null
-                                val fileName = "naicha_backup_${version}.json"
                                 
                                 scope.launch {
                                     withContext(Dispatchers.IO) {
@@ -445,7 +474,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                                     statusMsg = "❌ 数据解析失败: ${e.message}"
                                                 }
                                             } else {
-                                                statusMsg = "❌ 版本 $version 不存在或下载失败"
+                                                statusMsg = "❌ 下载失败"
                                             }
                                         }
                                     }
@@ -453,9 +482,19 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Taro)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (timeStr == "无备份") Color.LightGray else Taro
+                            ),
+                            enabled = timeStr != "无备份"
                         ) {
-                            Text("版本 $version")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(), 
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(fileName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(timeStr, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                            }
                         }
                     }
                 }
