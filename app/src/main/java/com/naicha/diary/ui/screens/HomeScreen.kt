@@ -416,7 +416,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     
                     // 👈 4. 评价标签渲染（带 Emoji 和好坏颜色）
                     if (tea.note.isNotBlank()) {
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(4.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             tea.note.split(" ").filter { it.isNotBlank() }.forEach { tag ->
                                 val (emoji, isGood) = getTagInfo(tag)
@@ -444,7 +444,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     if (tea.ice.isNotBlank()) tags.add(tea.ice)
                     if (tea.toppings.isNotEmpty()) tags.addAll(tea.toppings)
                     if (tags.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(4.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             tags.forEach { tag ->
                                 Box(modifier = Modifier.clip(RoundedCornerShape(50)).border(0.5.dp, Color(0xFFE0E0E0), RoundedCornerShape(50)).background(Color.White).padding(horizontal = 10.dp, vertical = 4.dp)) {
