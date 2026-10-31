@@ -308,9 +308,49 @@ fun BrandLogo(
     badge: String,
     size: Dp,
     modifier: Modifier = Modifier,
+    logoPath: String? = null, // 👈 新增
+    isCircle: Boolean = true, // 👈 新增
     squircle: Boolean = false,
 ) {
-    val shape: Shape = if (squircle) RoundedCornerShape(size * 0.30f) else CircleShape
+    // 形状逻辑：如果有本地图片，根据 isCircle 决定；否则按原来的 squircle 决定
+    val shape: Shape = if (logoPath != null) {
+        if (isCircle) CircleShape else RoundedCornerShape(size * 0.28f)
+    } else {
+        if (squircle) RoundedCornerShape(size * 0.30f) else CircleShape
+    }
+
+    // 1. 优先加载本地图片
+    if (logoPath != null) {
+        val file = java.io.File(logoPath)
+        if (file.exists()) {
+            val bitmap = remember(logoPath) { android.graphics.BitmapFactory.decodeFile(file.absolutePath) }
+            if (bitmap != null) {
+                Box(
+                    modifier = modifier
+                        .size(size)
+                        .shadow(
+                            elevation = size * 0.08f,
+                            shape = shape,
+                            ambientColor = Color.Black.copy(alpha = 0.25f),
+                            spotColor = Color.Black.copy(alpha = 0.25f),
+                        )
+                        .clip(shape)
+                        .background(Color.White)
+                        .border(0.8.dp, Color(0x18000000), shape),
+                ) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                return
+            }
+        }
+    }
+
+    // 2. 其次加载内置资源图片
     if (logo != 0) {
         Box(
             modifier = modifier
@@ -333,6 +373,7 @@ fun BrandLogo(
             )
         }
     } else {
+        // 3. 都没有，就显示文字
         Box(
             modifier = modifier
                 .size(size)
