@@ -68,4 +68,29 @@ object WebDavClient {
             }
         }
     }
+        // 👈 新增：获取文件最后修改时间
+    fun getLastModified(urlStr: String, user: String, pass: String, fileName: String): Result<Long> {
+        return runCatching {
+            var finalUrl = urlStr
+            if (!finalUrl.endsWith("/")) finalUrl += "/"
+            val fullUrl = "$finalUrl$fileName"
+
+            val url = URL(fullUrl)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "HEAD"
+            conn.setRequestProperty("Authorization", getBase64Auth(user, pass))
+
+            val responseCode = conn.responseCode
+            if (responseCode in 200..299) {
+                val lastModifiedStr = conn.getHeaderField("Last-Modified")
+                if (lastModifiedStr != null) {
+                    // 标准 HTTP 时间格式转换
+                    val sdf = java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", java.util.Locale.US)
+                    val date = sdf.parse(lastModifiedStr)
+                    return Result.success(date?.time ?: 0L)
+                }
+            }
+            throw Exception("获取时间失败")
+        }
+    }
 }
