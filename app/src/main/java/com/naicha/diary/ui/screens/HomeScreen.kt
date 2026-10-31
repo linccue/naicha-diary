@@ -58,8 +58,9 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-      val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
+    val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
     val hiddenBrands by com.naicha.diary.data.BrandStore.hiddenBrands.collectAsState()
+    
     var showCategory by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -201,9 +202,6 @@ fun HomeScreen(
                                 Text(text = "杯", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(bottom = 6.dp))
                             }
                             Spacer(Modifier.weight(1f))
-                                                        // 👈 星级放到名字后面
-                            RatingStars(rating = tea.rating, starSize = 14.dp)
-                            Spacer(Modifier.width(8.dp))
                             Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 5.dp)) {
                                 Text(text = "总记录数量：$totalCount", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
@@ -390,7 +388,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                         Image(painter = painterResource(id = getDrinkIconRes(tea)), contentDescription = null, modifier = Modifier.fillMaxSize().padding(6.dp), contentScale = ContentScale.Fit)
                     }
                     Box(modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp).background(Color.White, CircleShape).padding(2.dp)) {
-                       BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, logoPath = brand.logoPath, isCircle = brand.isCircle, squircle = Catalog.isSquircle(brand.name))
+                        BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, logoPath = brand.logoPath, isCircle = brand.isCircle, squircle = Catalog.isSquircle(brand.name))
                     }
                 }
                 Spacer(Modifier.width(16.dp))
@@ -398,11 +396,15 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(text = displayName, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(8.dp))
+                        
+                        // 👈 星级放到名字后面
+                        RatingStars(rating = tea.rating, starSize = 14.dp)
+                        Spacer(Modifier.width(8.dp))
+                        
                         Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF4F5F0)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                             Text(text = TimeUtil.dayLabel(tea.timestamp), style = MaterialTheme.typography.labelSmall, color = PearlSoft)
                         }
                     }
-                                        // 👈 星级跟在名字后面了
                     Spacer(Modifier.height(2.dp))
                     Text(text = tea.brand.ifBlank { "未知品牌" }, style = MaterialTheme.typography.bodyMedium, color = PearlSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     
@@ -413,6 +415,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                     }
                     
                     Spacer(Modifier.height(6.dp))
+                    
                     val tags = mutableListOf<String>()
                     if (tea.sugar.isNotBlank()) tags.add(tea.sugar)
                     if (tea.ice.isNotBlank()) tags.add(tea.ice)
