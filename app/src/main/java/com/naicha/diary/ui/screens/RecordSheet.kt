@@ -465,9 +465,17 @@ fun RecordSheet(
                                     tint = PearlSoft
                                 )
                             }
-                            AnimatedVisibility(visible = showTags) {
+                                                       AnimatedVisibility(visible = showTags) {
                                 TagSelectionRow(selectedTags = selectedTags, onToggleTag = { tag ->
-                                    selectedTags = if (selectedTags.contains(tag)) selectedTags - tag else selectedTags + tag
+                                    if (selectedTags.contains(tag)) {
+                                        selectedTags = selectedTags - tag
+                                    } else {
+                                        if (selectedTags.size < 6) {
+                                            selectedTags = selectedTags + tag
+                                        } else {
+                                            android.widget.Toast.makeText(context, "最多只能选择6条评价哦", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 })
                             }
                         }
