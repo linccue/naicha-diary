@@ -17,6 +17,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+          com.naicha.diary.data.BrandStore.init(this)
         setContent {
             DrinkTheme {
                 DrinkRoot()
