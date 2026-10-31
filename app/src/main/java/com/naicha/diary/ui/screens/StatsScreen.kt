@@ -35,6 +35,8 @@ import java.util.concurrent.TimeUnit
 
 @Composable
 fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
+     val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
+    val hiddenBrands by com.naicha.diary.data.BrandStore.hiddenBrands.collectAsState()
     val total = items.size
     val totalSpend = remember(items) { items.sumOf { it.price } }
     val totalCalories = remember(items) { items.sumOf { it.calories } }
