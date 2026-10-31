@@ -387,7 +387,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                         Image(painter = painterResource(id = getDrinkIconRes(tea)), contentDescription = null, modifier = Modifier.fillMaxSize().padding(6.dp), contentScale = ContentScale.Fit)
                     }
                     Box(modifier = Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp).background(Color.White, CircleShape).padding(2.dp)) {
-                        BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, squircle = Catalog.isSquircle(brand.name))
+                       BrandBadge(badge = brand.badge, color = Color(brand.color), size = 20.dp, logo = brand.logo, logoPath = brand.logoPath, isCircle = brand.isCircle, squircle = Catalog.isSquircle(brand.name))
                     }
                 }
                 Spacer(Modifier.width(16.dp))
