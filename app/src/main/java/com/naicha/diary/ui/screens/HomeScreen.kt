@@ -58,6 +58,8 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+      val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
+    val hiddenBrands by com.naicha.diary.data.BrandStore.hiddenBrands.collectAsState()
     var showCategory by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
