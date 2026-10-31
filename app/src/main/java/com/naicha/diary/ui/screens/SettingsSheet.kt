@@ -41,12 +41,9 @@ import com.naicha.diary.util.rememberHaptics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.UUID
-
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,7 +129,7 @@ fun SettingsContent(
 private fun SettingsAiCard() {
     val scope = rememberCoroutineScope()
     val haptics = rememberHaptics()
-        var showRestoreMenu by remember { mutableStateOf(false) } // 👈 弹出菜单开关
+
     var apiKey by remember { mutableStateOf(AppSettings.apiKey) }
     var reveal by remember { mutableStateOf(false) }
     var testing by remember { mutableStateOf(false) }
@@ -208,6 +205,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
     val haptics = rememberHaptics()
     
     var confirmClear by remember { mutableStateOf(false) }
+    var showRestoreMenu by remember { mutableStateOf(false) } // 👈 控制选择备份的弹窗
     
     val prefs = remember { context.getSharedPreferences("webdav_prefs", android.content.Context.MODE_PRIVATE) }
     var url by remember { mutableStateOf(prefs.getString("url", "") ?: "") }
@@ -279,7 +277,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(modifier = Modifier.weight(1f)) {
-                 GradientButton(
+                GradientButton(
                     text = if (isWorking) "处理中…" else "立即备份",
                     onClick = {
                         if (url.isBlank() || user.isBlank() || pass.isBlank()) {
@@ -292,7 +290,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                         scope.launch {
                             withContext(Dispatchers.IO) {
                                 try {
-                                    // 1. 处理自定义品牌的图片（转 Base64）
                                     val brandPrefs = context.getSharedPreferences("brand_store", android.content.Context.MODE_PRIVATE)
                                     val orderPrefs = context.getSharedPreferences("naicha_brand_order_prefs", android.content.Context.MODE_PRIVATE)
                                     val hiddenStr = brandPrefs.getString("hidden", "") ?: ""
@@ -310,7 +307,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                         brand.copy(logoPath = base64)
                                     }
 
-                                    // 2. 组装成 BackupData
                                     val backup = BackupData(
                                         drinks = items,
                                         customBrands = brandsWithBase64,
@@ -320,7 +316,9 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                     
                                     val json = Json { encodeDefaults = true }
                                     val jsonStr = json.encodeToString(BackupData.serializer(), backup)
-                                   var index = prefs.getInt("auto_backup_index", 1)
+                                    
+                                    // 👈 轮询逻辑
+                                    var index = prefs.getInt("auto_backup_index", 1)
                                     if (index < 1 || index > 3) index = 1
                                     val fileName = "naicha_backup_${index}.json"
 
@@ -355,71 +353,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                             statusMsg = "请先填写完整的 WebDAV 配置"
                             return@GradientButton
                         }
-                        showRestoreMenu = true // 👈 显示选择菜单
-                    },
-                    colors = listOf(Taro, Color(0xFFCBBAF5))
-                )
-                        haptics.tick()
-                        isWorking = true
-                        statusMsg = null
-                        scope.launch {
-                            withContext(Dispatchers.IO) {
-                                val res = WebDavClient.download(url, user, pass)
-                                withContext(Dispatchers.Main) {
-                                    if (res.isSuccess) {
-                                        try {
-                                            val jsonStr = res.getOrThrow()
-                                            val json = Json { ignoreUnknownKeys = true }
-                                            
-                                            // 尝试按照新格式解析
-                                            val backup = try {
-                                                json.decodeFromString(BackupData.serializer(), jsonStr)
-                                            } catch (e: Exception) {
-                                                // 兼容旧版本只有 List<Drink> 的备份
-                                                BackupData(drinks = json.decodeFromString<List<Drink>>(jsonStr))
-                                            }
-                                            
-                                            // 1. 还原饮品
-                                            DrinkRepository(context).replaceAll(backup.drinks)
-                                            
-                                            // 2. 还原品牌图片
-                                            val restoredBrands = backup.customBrands.map { brand ->
-                                                val base64 = brand.logoPath
-                                                if (base64 != null && base64.startsWith("data:image")) {
-                                                    val imageBytes = android.util.Base64.decode(base64.substringAfter(","), android.util.Base64.NO_WRAP)
-                                                    val newFile = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
-                                                    newFile.writeBytes(imageBytes)
-                                                    brand.copy(logoPath = newFile.absolutePath)
-                                                } else {
-                                                    brand
-                                                }
-                                            }
-                                            
-                                            // 3. 写回本地配置
-                                            val brandPrefs = context.getSharedPreferences("brand_store", android.content.Context.MODE_PRIVATE)
-                                            brandPrefs.edit()
-                                                .putString("custom", json.encodeToString(restoredBrands))
-                                                .putString("hidden", backup.hiddenBrands)
-                                                .apply()
-                                                
-                                            val orderPrefs = context.getSharedPreferences("naicha_brand_order_prefs", android.content.Context.MODE_PRIVATE)
-                                            orderPrefs.edit().putString("brand_order", backup.brandOrder).apply()
-                                            
-                                            // 4. 热刷新 BrandStore
-                                            BrandStore.reload(context)
-                                            
-                                            statusMsg = "✅ 饮品与品牌均还原成功！请返回主页查看"
-                                            haptics.confirm()
-                                        } catch (e: Exception) {
-                                            statusMsg = "❌ 数据解析失败: ${e.message}"
-                                        }
-                                    } else {
-                                        statusMsg = "❌ ${res.exceptionOrNull()?.message}"
-                                    }
-                                }
-                            }
-                            isWorking = false
-                        }
+                        showRestoreMenu = true // 👈 打开选择菜单
                     },
                     colors = listOf(Taro, Color(0xFFCBBAF5))
                 )
@@ -450,6 +384,87 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
             colors = if (confirmClear) listOf(Color(0xFFE53935), Color(0xFFEF5350)) else listOf(Strawberry, Color(0xFFFFB3C6)),
         )
     }
+
+    // 👈 新增：选择要恢复的备份版本弹窗
+    if (showRestoreMenu) {
+        AlertDialog(
+            onDismissRequest = { showRestoreMenu = false },
+            title = { Text("选择要恢复的版本") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(1, 2, 3).forEach { version ->
+                        Button(
+                            onClick = {
+                                showRestoreMenu = false
+                                isWorking = true
+                                statusMsg = null
+                                val fileName = "naicha_backup_${version}.json"
+                                
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        val res = WebDavClient.download(url, user, pass, fileName)
+                                        withContext(Dispatchers.Main) {
+                                            if (res.isSuccess) {
+                                                try {
+                                                    val jsonStr = res.getOrThrow()
+                                                    val json = Json { ignoreUnknownKeys = true }
+                                                    val backup = try {
+                                                        json.decodeFromString(BackupData.serializer(), jsonStr)
+                                                    } catch (e: Exception) {
+                                                        BackupData(drinks = json.decodeFromString<List<Drink>>(jsonStr))
+                                                    }
+                                                    
+                                                    DrinkRepository(context).replaceAll(backup.drinks)
+                                                    
+                                                    val restoredBrands = backup.customBrands.map { brand ->
+                                                        val base64 = brand.logoPath
+                                                        if (base64 != null && base64.startsWith("data:image")) {
+                                                            val imageBytes = android.util.Base64.decode(base64.substringAfter(","), android.util.Base64.NO_WRAP)
+                                                            val newFile = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
+                                                            newFile.writeBytes(imageBytes)
+                                                            brand.copy(logoPath = newFile.absolutePath)
+                                                        } else {
+                                                            brand
+                                                        }
+                                                    }
+                                                    
+                                                    val brandPrefs = context.getSharedPreferences("brand_store", android.content.Context.MODE_PRIVATE)
+                                                    brandPrefs.edit()
+                                                        .putString("custom", json.encodeToString(restoredBrands))
+                                                        .putString("hidden", backup.hiddenBrands)
+                                                        .apply()
+                                                        
+                                                    val orderPrefs = context.getSharedPreferences("naicha_brand_order_prefs", android.content.Context.MODE_PRIVATE)
+                                                    orderPrefs.edit().putString("brand_order", backup.brandOrder).apply()
+                                                    
+                                                    BrandStore.reload(context)
+                                                    
+                                                    statusMsg = "✅ 版本 $version 还原成功！"
+                                                    haptics.confirm()
+                                                } catch (e: Exception) {
+                                                    statusMsg = "❌ 数据解析失败: ${e.message}"
+                                                }
+                                            } else {
+                                                statusMsg = "❌ 版本 $version 不存在或下载失败"
+                                            }
+                                        }
+                                    }
+                                    isWorking = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Taro)
+                        ) {
+                            Text("版本 $version")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showRestoreMenu = false }) { Text("取消") }
+            }
+        )
+    }
 }
 
 @Composable
@@ -457,7 +472,6 @@ private fun SettingsAboutCard() {
     val context = LocalContext.current
     val crash = remember { DrinkApp.lastCrash(context) }
 
-    // 👇 动态获取真实的版本号
     val versionName = remember {
         try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
@@ -470,88 +484,10 @@ private fun SettingsAboutCard() {
         SoftCard {
             SectionHeader(title = "关于", subtitle = "饮品日记")
             Spacer(Modifier.height(10.dp))
-            InfoLine("版本", versionName) // 👈 使用动态变量
+            InfoLine("版本", versionName)
             InfoLine("AI 模型", "deepseek-flash（视觉）")
             InfoLine("数据存储", "本机文件，不上传")
             InfoLine("玻璃材质", "chrisbanes/haze")
-                    // 👈 新增：选择要恢复的备份版本
-        if (showRestoreMenu) {
-            AlertDialog(
-                onDismissRequest = { showRestoreMenu = false },
-                title = { Text("选择要恢复的版本") },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(1, 2, 3).forEach { version ->
-                            Button(
-                                onClick = {
-                                    showRestoreMenu = false
-                                    isWorking = true
-                                    statusMsg = null
-                                    val fileName = "naicha_backup_${version}.json"
-                                    
-                                    scope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            val res = WebDavClient.download(url, user, pass, fileName)
-                                            withContext(Dispatchers.Main) {
-                                                if (res.isSuccess) {
-                                                    try {
-                                                        val jsonStr = res.getOrThrow()
-                                                        val json = Json { ignoreUnknownKeys = true }
-                                                        val backup = try {
-                                                            json.decodeFromString(BackupData.serializer(), jsonStr)
-                                                        } catch (e: Exception) {
-                                                            BackupData(drinks = json.decodeFromString<List<Drink>>(jsonStr))
-                                                        }
-                                                        
-                                                        DrinkRepository(context).replaceAll(backup.drinks)
-                                                        
-                                                        val restoredBrands = backup.customBrands.map { brand ->
-                                                            val base64 = brand.logoPath
-                                                            if (base64 != null && base64.startsWith("data:image")) {
-                                                                val imageBytes = android.util.Base64.decode(base64.substringAfter(","), android.util.Base64.NO_WRAP)
-                                                                val newFile = File(context.filesDir, "brand_${UUID.randomUUID()}.jpg")
-                                                                newFile.writeBytes(imageBytes)
-                                                                brand.copy(logoPath = newFile.absolutePath)
-                                                            } else brand
-                                                        }
-                                                        
-                                                        val brandPrefs = context.getSharedPreferences("brand_store", Context.MODE_PRIVATE)
-                                                        brandPrefs.edit()
-                                                            .putString("custom", json.encodeToString(restoredBrands))
-                                                            .putString("hidden", backup.hiddenBrands)
-                                                            .apply()
-                                                            
-                                                        val orderPrefs = context.getSharedPreferences("naicha_brand_order_prefs", Context.MODE_PRIVATE)
-                                                        orderPrefs.edit().putString("brand_order", backup.brandOrder).apply()
-                                                        
-                                                        BrandStore.reload(context)
-                                                        
-                                                        statusMsg = "✅ 版本 $version 还原成功！"
-                                                        haptics.confirm()
-                                                    } catch (e: Exception) {
-                                                        statusMsg = "❌ 数据解析失败: ${e.message}"
-                                                    }
-                                                } else {
-                                                    statusMsg = "❌ 版本 $version 不存在或下载失败"
-                                                }
-                                            }
-                                        }
-                                        isWorking = false
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = Taro)
-                            ) {
-                                Text("版本 $version")
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showRestoreMenu = false }) { Text("取消") }
-                }
-            )
-        }
         }
         
         if (crash != null) {
@@ -565,6 +501,7 @@ private fun SettingsAboutCard() {
         }
     }
 }
+
 @Composable
 private fun SmallButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
