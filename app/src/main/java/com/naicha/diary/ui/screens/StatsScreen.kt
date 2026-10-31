@@ -104,12 +104,11 @@ fun StatsScreen(items: List<Drink>, modifier: Modifier = Modifier) {
                     }
                 }
 
-                // 6. 品牌墙点亮
+                                // 6. 品牌墙点亮
                 item {
                     StatsCard {
                         val unlockedCount = remember(items) { 
-                            val unlocked = items.map { it.brand }.toSet()
-                            Catalog.brands.take(20).count { unlocked.contains(it.name) }
+                            items.map { it.brand }.distinct().size.coerceAtMost(20)
                         }
                         SectionHeader(title = "品牌墙点亮", subtitle = "已点亮 $unlockedCount/20 个品牌")
                         Spacer(Modifier.height(12.dp))
