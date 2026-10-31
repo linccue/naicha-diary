@@ -418,12 +418,15 @@ private fun SpendingRankCard(items: List<Drink>) {
         items.filter { it.timestamp >= startTime }
     }
 
-     val brandSpending = remember(filteredItems) {
+    // 👈 确保这一行在 remember 的外面，这样下方才能正常引用
+    val totalSpend = filteredItems.sumOf { it.price }
+    
+    val brandSpending = remember(filteredItems) {
         filteredItems.groupBy { it.brand }
             .mapValues { entry -> entry.value.sumOf { it.price } }
-            .filter { it.value > 0 } // 👈 顺便过滤掉消费为 0 的品牌（比如只记了没写价格）
+            .filter { it.value > 0 } // 👈 过滤掉消费为0的品牌
             .toList()
-            .sortedByDescending { it.second } // 👈 移除了 take(4)
+            .sortedByDescending { it.second } // 👈 已经去掉了 take(4)，显示全部
     }
 
     StatsCard {
