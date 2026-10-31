@@ -201,6 +201,9 @@ fun HomeScreen(
                                 Text(text = "杯", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(bottom = 6.dp))
                             }
                             Spacer(Modifier.weight(1f))
+                                                        // 👈 星级放到名字后面
+                            RatingStars(rating = tea.rating, starSize = 14.dp)
+                            Spacer(Modifier.width(8.dp))
                             Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF0F0F0)).padding(horizontal = 10.dp, vertical = 5.dp)) {
                                 Text(text = "总记录数量：$totalCount", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                             }
@@ -399,10 +402,17 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                             Text(text = TimeUtil.dayLabel(tea.timestamp), style = MaterialTheme.typography.labelSmall, color = PearlSoft)
                         }
                     }
+                                        // 👈 星级跟在名字后面了
                     Spacer(Modifier.height(2.dp))
                     Text(text = tea.brand.ifBlank { "未知品牌" }, style = MaterialTheme.typography.bodyMedium, color = PearlSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    
+                    // 👈 评价显示在品牌下面
+                    if (tea.note.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(text = tea.note, style = MaterialTheme.typography.labelSmall, color = PearlSoft.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    
                     Spacer(Modifier.height(6.dp))
-                    RatingStars(rating = tea.rating, starSize = 14.dp)
                     val tags = mutableListOf<String>()
                     if (tea.sugar.isNotBlank()) tags.add(tea.sugar)
                     if (tea.ice.isNotBlank()) tags.add(tea.ice)
