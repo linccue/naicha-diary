@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -197,6 +198,10 @@ private fun WallTabContent(items: List<Drink>, onOpenDetail: (Drink) -> Unit) {
                 selectedDay = selectedDay,
                 onSelectDay = { selectedDay = it }
             )
+            // 👈 新增虚线分隔
+            Spacer(Modifier.height(16.dp))
+            DashedDivider(color = Color(0xFFE0E0E0))
+            Spacer(Modifier.height(4.dp))
         }
 
         item {
@@ -238,6 +243,7 @@ private fun DraggableStickerWall(allItems: List<Drink>) {
     }
 
     BoxWithConstraints(
+        // 👈 修改：背景色改为 #EDEEE7
         modifier = Modifier.fillMaxWidth().height(wallHeight).clip(RoundedCornerShape(24.dp)).background(Color(0xFFEDEEE7))
     ) {
         val maxWidthPx = constraints.maxWidth.toFloat()
@@ -508,13 +514,14 @@ private fun CalendarCard(
             }
         }
         
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp)) // 👈 原本是 16.dp，改小一点
         
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            // 👈 修改：按钮变扁
             Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).border(1.dp, Color(0xFFF0F0F0), RoundedCornerShape(50)).clickable {
                 val c = Calendar.getInstance(); onMonthChange(c); onSelectDay(c.get(Calendar.DAY_OF_MONTH))
-            }.padding(horizontal = 20.dp, vertical = 8.dp)) {
-                Text("回到今天", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+            }.padding(horizontal = 24.dp, vertical = 5.dp)) {
+                Text("回到今天", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.Black)
             }
         }
     }
@@ -708,5 +715,19 @@ private fun TimelineRow(tea: Drink, onClick: () -> Unit) {
                 Text(text = "¥${formatMoney(tea.price)}", style = MaterialTheme.typography.titleMedium, color = Caramel)
             }
         }
+    }
+}
+
+// 👈 新增：虚线分隔组件
+@Composable
+private fun DashedDivider(modifier: Modifier = Modifier, color: Color = Color(0xFFE0E0E0)) {
+    Canvas(modifier = modifier.fillMaxWidth().height(1.dp)) {
+        drawLine(
+            color = color,
+            start = Offset(0f, center.y),
+            end = Offset(size.width, center.y),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f),
+            strokeWidth = 1.dp.toPx()
+        )
     }
 }
