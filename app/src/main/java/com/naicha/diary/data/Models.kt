@@ -161,9 +161,8 @@ object Catalog {
     
     // 👇 核心修改：优先查自定义品牌
         fun brandOf(name: String): Brand {
-        val cleanName = name.trim()
-        return brands.firstOrNull { it.name.trim() == cleanName } 
-            ?: extraBrands.firstOrNull { it.name.trim() == cleanName } 
+        return brands.firstOrNull { it.name == name }
+            ?: BrandStore.customBrands.value.firstOrNull { it.name == name }
             ?: brands.last()
     }
         
@@ -172,7 +171,7 @@ object Catalog {
     // 👇 核心修改：让自定义的方形图标也能生效
     fun isSquircle(name: String): Boolean {
         if (name in setOf("喜茶", "奈雪的茶", "霸王茶姬", "陈文鼎", "煲珠公")) return true
-        val custom = extraBrands.firstOrNull { it.name == name }
+        val custom = BrandStore.customBrands.value.firstOrNull { it.name == name }
         return custom?.let { !it.isCircle } ?: false
     }
     
