@@ -241,3 +241,10 @@ object BrandStore {
         prefs?.edit()?.putString("hidden", current.joinToString(","))?.apply()
     }
 }
+@Serializable
+data class BackupData(
+    val drinks: List<Drink> = emptyList(),
+    val customBrands: List<Brand> = emptyList(),
+    val hiddenBrands: String = "",
+    val brandOrder: String = ""
+)
