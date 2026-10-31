@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -16,9 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +31,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -87,13 +87,20 @@ fun RecordSheet(
     var brand by remember { mutableStateOf(initial?.brand ?: "") }
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var cupSize by remember { mutableStateOf(initial?.cupSize ?: "中杯") }
-    var sugar by remember { mutableStateOf(initial?.sugar ?: "七分糖") }
+    
+    // 👈 修改：甜度不默认选择
+    var sugar by remember { mutableStateOf(initial?.sugar ?: "") }
+    
     var ice by remember { mutableStateOf(initial?.ice ?: "") }
     var toppings by remember { mutableStateOf(initial?.toppings ?: emptyList()) }
     var priceText by remember { mutableStateOf(initial?.price?.takeIf { it > 0 }?.let { formatMoney(it) } ?: "") }
     var rating by remember { mutableStateOf(initial?.rating ?: 0f) }
     var mood by remember { mutableStateOf(initial?.mood ?: "") }
-    var note by remember { mutableStateOf(initial?.note ?: "") }
+    
+    // 👈 修改：用 Set 存储评价标签
+    var selectedTags by remember { mutableStateOf(initial?.note?.split(" ")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()) }
+    var showTags by remember { mutableStateOf(false) } // 评价展开状态
+    
     var photoName by remember { mutableStateOf(initial?.photoPath) }
 
     var showDatePicker by remember { mutableStateOf(false) }
@@ -119,23 +126,17 @@ fun RecordSheet(
         }
     }
 
-            val showAllBrands = remember(customBrands, hiddenBrands, savedBrandOrder, category) {
+    val showAllBrands = remember(customBrands, hiddenBrands, savedBrandOrder, category) {
         val base = (Catalog.brandsOf(category) + customBrands).filter { !hiddenBrands.contains(it.name) }
         if (savedBrandOrder.isEmpty()) {
-            // 没有排序记录时，旧逻辑保持不变
             val custom = base.filter { b -> customBrands.any { it.name == b.name } }
             val catalog = base.filter { b -> customBrands.none { it.name == b.name } }
             custom + catalog
         } else {
             val byName = base.associateBy { it.name }
-            // 找出不在已保存顺序里的新品牌
             val notInOrder = base.filter { it.name !in savedBrandOrder }
-            
             val ordered = ArrayList<Brand>()
-            // 1. 按之前保存的顺序排（同时剔除掉 notInOrder，避免重复）
             savedBrandOrder.mapNotNull { byName[it] }.forEach { ordered.add(it) }
-            
-            // 2. 把没记录的新品牌插到第四行第一个（索引15）
             notInOrder.forEach { newBrand ->
                 val targetIndex = 15
                 if (ordered.size >= targetIndex) {
@@ -158,7 +159,7 @@ fun RecordSheet(
         val sizes = Catalog.sizesFor(next)
         if (cupSize !in sizes) cupSize = sizes.getOrElse(1) { sizes.first() }
         val sugars = Catalog.sugarOptions(next)
-        if (sugar !in sugars && sugar.isNotBlank()) sugar = "七分糖"
+        if (sugar !in sugars && sugar.isNotBlank()) sugar = ""
         val ices = Catalog.iceOptions(next)
         if (ice !in ices && ice.isNotBlank()) ice = ""
         val extras = Catalog.extraOptions(next)
@@ -174,7 +175,7 @@ fun RecordSheet(
         ice = drink.ice
         toppings = drink.toppings
         if (drink.price > 0) priceText = formatMoney(drink.price)
-        if (drink.note.isNotBlank()) note = drink.note
+        if (drink.note.isNotBlank()) selectedTags = drink.note.split(" ").toSet()
     }
 
     fun runRecognize(uri: Uri) {
@@ -307,21 +308,16 @@ fun RecordSheet(
                                         onClick = { brand = item.name }
                                     )
                                 }
-                                                               Box(
+                                Box(
                                     modifier = Modifier
                                         .width(62.dp)
-                                        .height(66.dp) // 👈 与 BrandChip 完全一致的高度
+                                        .height(66.dp)
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(Color(0xFFF0F0F0))
                                         .clickable { showBrandManager = true },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add, 
-                                        contentDescription = "添加品牌", 
-                                        tint = Color.Gray, 
-                                        modifier = Modifier.size(28.dp)
-                                    )
+                                    Icon(Icons.Default.Add, "添加品牌", tint = Color.Gray, modifier = Modifier.size(28.dp))
                                 }
                             }
                         }
@@ -375,8 +371,32 @@ fun RecordSheet(
                                 )
                             }
                             FieldGroup(title = "评分", modifier = Modifier.weight(1f)) {
-                                Box(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 12.dp, vertical = 15.dp)) {
+                                // 👈 修改：添加评分标语
+                                Column(modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 12.dp, vertical = 12.dp)) {
                                     RatingStars(rating = rating, starSize = 24.dp, onRate = { rating = it })
+                                    val labelText = when (rating) {
+                                        0.5f -> "明显不喜欢\n明显踩雷，不会再点"
+                                        1.0f -> "不喜欢\n口味或品质有明显问题"
+                                        1.5f -> "偏差\n勉强喝完，不考虑回购"
+                                        2.0f -> "一般偏下\n不太符合预期"
+                                        2.5f -> "普通\n能喝，但没有记忆点"
+                                        3.0f -> "还可以\n正常水平，下次可能会点"
+                                        3.5f -> "还不错\n整体满意，可以回购"
+                                        4.0f -> "好喝\n有特点，愿意推荐给朋友"
+                                        4.5f -> "很好喝\n明显喜欢，经常会点"
+                                        5.0f -> "非常喜欢\n个人心中顶级，强烈推荐"
+                                        else -> ""
+                                    }
+                                    if (labelText.isNotEmpty()) {
+                                        Spacer(Modifier.height(8.dp))
+                                        Text(
+                                            text = labelText,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -429,13 +449,27 @@ fun RecordSheet(
                     }
 
                     item {
-                        FieldGroup(title = "备注", subtitle = "可选") {
-                            OutlinedTextField(
-                                value = note, onValueChange = { note = it.take(120) },
-                                placeholder = { Text("今天为什么想喝这杯…", color = Outline) },
-                                minLines = 2, modifier = Modifier.fillMaxWidth(),
-                                shape = MaterialTheme.shapes.medium, colors = drinkFieldColors(),
-                            )
+                        // 👈 修改：评价选项展开面板
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable { showTags = !showTags },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "评价", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+                                Spacer(Modifier.width(6.dp))
+                                Text(text = "可选", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.weight(1f))
+                                Icon(
+                                    imageVector = if (showTags) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = PearlSoft
+                                )
+                            }
+                            AnimatedVisibility(visible = showTags) {
+                                TagSelectionRow(selectedTags = selectedTags, onToggleTag = { tag ->
+                                    selectedTags = if (selectedTags.contains(tag)) selectedTags - tag else selectedTags + tag
+                                })
+                            }
                         }
                     }
 
@@ -479,7 +513,7 @@ fun RecordSheet(
                                 category = category.label, brand = brand.ifBlank { "自制 / 其他" }, name = name.trim(),
                                 cupSize = cupSize, sugar = sugar, ice = ice, toppings = toppings,
                                 price = priceText.toDoubleOrNull() ?: 0.0, rating = rating, mood = mood,
-                                note = note.trim(), photoPath = photoName, timestamp = selectedDate,
+                                note = selectedTags.joinToString(" "), photoPath = photoName, timestamp = selectedDate,
                             )
                             onSave(item)
                         },
@@ -577,6 +611,66 @@ fun RecordSheet(
     }
 }
 
+// 👈 新增：评价标签选择面板
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TagSelectionRow(selectedTags: Set<String>, onToggleTag: (String) -> Unit) {
+    val goodTags = listOf(
+        "清爽" to "🍃", "果肉多" to "🍓", "果味自然" to "🍎", "喝着开心" to "😋",
+        "果味清甜" to "🍇", "越喝越甜" to "🍯", "甜得明显" to "🍬", "解馋" to "🤤",
+        "会回购" to "🛒", "刚刚好" to "👌", "性价比高" to "💰", "甜得自然" to "🌿",
+        "顺口" to "😌", "有记忆点" to "🧠", "口感丰富" to "🌈", "茶底厚" to "🍵",
+        "不甜" to "🧊", "第一口惊艳" to "✨", "顺滑" to "🧴", "没负担" to "🪶",
+        "奶味轻" to "🥛", "有奶香" to "🐄"
+    )
+    val badTags = listOf(
+        "喝到后面腻" to "🤢", "不想再喝" to "🙅", "有负担" to "🏋️", "厚重" to "🪨",
+        "甜奶感" to "🍮", "容易喝完" to "💨", "不会专门买" to "🚫", "有点腻" to "😖",
+        "价格不值" to "💸", "睡前慎点" to "🌙", "喝完口渴" to "🥵", "寡淡" to "💧",
+        "越喝越普通" to "📉", "没记忆点" to "❓"
+    )
+    
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // 夸的点
+        Column {
+            Text(text = "大家夸的点", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(bottom = 8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                goodTags.forEach { (tag, emoji) ->
+                    val selected = selectedTags.contains(tag)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (selected) Color(0xFFB9D93B) else Color(0xFFD4F647))
+                            .clickable { onToggleTag(tag) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(text = "$emoji $tag", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+        
+        // 吐槽的点
+        Column {
+            Text(text = "大家吐槽的点", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.Black, modifier = Modifier.padding(bottom = 8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                badTags.forEach { (tag, emoji) ->
+                    val selected = selectedTags.contains(tag)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (selected) Color(0xFFF5DCD9) else Color(0xFFFDF2F0))
+                            .clickable { onToggleTag(tag) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(text = "$emoji $tag", color = Color(0xFFB80509), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CategorySwitcher(
@@ -663,7 +757,7 @@ private fun PreviewRow(liquid: Color, straw: Color, style: CupStyle, toppingCoun
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = brand.ifBlank { "选个品牌吧" }, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(4.dp))
-                Text(text = listOf(name.ifBlank { "还没写品名" }, cupSize, sugar).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
+                Text(text = listOf(name.ifBlank { "还没写品名" }, cupSize, sugar.ifBlank { "未选糖度" }).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = PearlSoft)
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (rating > 0f) RatingStars(rating = rating, starSize = 14.dp)
