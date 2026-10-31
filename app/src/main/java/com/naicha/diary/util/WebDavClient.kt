@@ -10,16 +10,14 @@ object WebDavClient {
 
     private fun getBase64Auth(user: String, pass: String): String {
         val auth = "$user:$pass"
-        // 使用 Android 原生的 Base64，完美兼容所有机型
         return "Basic " + android.util.Base64.encodeToString(auth.toByteArray(), android.util.Base64.NO_WRAP)
     }
 
-    // 上传文件
-    fun upload(urlStr: String, user: String, pass: String, fileBytes: ByteArray): Result<Unit> {
+    // 👈 新增了 fileName 参数，默认值为 naicha_backup.json（兼容旧逻辑）
+    fun upload(urlStr: String, user: String, pass: String, fileBytes: ByteArray, fileName: String = "naicha_backup.json"): Result<Unit> {
         return runCatching {
             var finalUrl = urlStr
             if (!finalUrl.endsWith("/")) finalUrl += "/"
-            val fileName = "naicha_backup.json"
             val fullUrl = "$finalUrl$fileName"
 
             val url = URL(fullUrl)
@@ -43,12 +41,11 @@ object WebDavClient {
         }
     }
 
-    // 下载文件
-    fun download(urlStr: String, user: String, pass: String): Result<String> {
+    // 👈 新增了 fileName 参数
+    fun download(urlStr: String, user: String, pass: String, fileName: String = "naicha_backup.json"): Result<String> {
         return runCatching {
             var finalUrl = urlStr
             if (!finalUrl.endsWith("/")) finalUrl += "/"
-            val fileName = "naicha_backup.json"
             val fullUrl = "$finalUrl$fileName"
 
             val url = URL(fullUrl)
@@ -67,7 +64,7 @@ object WebDavClient {
                 reader.close()
                 return Result.success(response.toString())
             } else {
-                throw Exception("下载失败，HTTP状态码: $responseCode。请检查路径或账号密码")
+                throw Exception("下载失败，HTTP状态码: $responseCode。请检查是否存在该备份")
             }
         }
     }
