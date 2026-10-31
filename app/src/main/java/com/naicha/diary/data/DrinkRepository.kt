@@ -40,14 +40,13 @@ class DrinkRepository(private val context: Context) {
         runCatching { file.writeText(json.encodeToString(list)) }
     }
 
-    // 👇 核心新增：静默自动上传 WebDAV
+       // 👇 核心新增：静默自动上传 WebDAV
     private fun triggerAutoSync() {
         val prefs = context.getSharedPreferences("webdav_prefs", Context.MODE_PRIVATE)
         val url = prefs.getString("url", "") ?: ""
         val user = prefs.getString("user", "") ?: ""
         val pass = prefs.getString("pass", "") ?: ""
         
-        // 如果用户没有在设置里配置过 WebDAV，则不触发自动同步
         if (url.isBlank() || user.isBlank() || pass.isBlank()) return
 
         syncScope.launch {
@@ -77,9 +76,20 @@ class DrinkRepository(private val context: Context) {
                 )
                 
                 val jsonStr = json.encodeToString(BackupData.serializer(), backup)
-                WebDavClient.upload(url, user, pass, jsonStr.toByteArray())
+
+                // 👈 轮询：读取当前索引，上传到对应文件名，索引+1（1,2,3轮询）
+                var index = prefs.getInt("auto_backup_index", 1)
+                if (index < 1 || index > 3) index = 1
+                val fileName = "naicha_backup_${index}.json"
+                
+                val res = WebDavClient.upload(url, user, pass, jsonStr.toByteArray(), fileName)
+                
+                // 如果上传成功，才更新索引
+                if (res.isSuccess) {
+                    val nextIndex = if (index >= 3) 1 else index + 1
+                    prefs.edit().putInt("auto_backup_index", nextIndex).apply()
+                }
             } catch (e: Exception) {
-                // 自动同步失败时不打扰用户
                 e.printStackTrace()
             }
         }
