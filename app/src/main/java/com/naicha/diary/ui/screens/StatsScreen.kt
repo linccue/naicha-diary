@@ -208,28 +208,45 @@ private fun CategoryDistribution(items: List<Drink>) {
 }
 
 // ================= 品牌墙点亮 =================
+// ================= 品牌墙点亮 =================
 @Composable
 private fun BrandWall(items: List<Drink>) {
-    val unlockedBrands = remember(items) { items.map { it.brand }.toSet() }
-    val customBrands by com.naicha.diary.data.BrandStore.customBrands.collectAsState()
-val displayBrands = remember(customBrands) { Catalog.brands + customBrands }
+    // 1. 按照时间排序，提取出所有被喝过的品牌名字（去重，保持首次喝的时间顺序）
+    val uniqueBrandNames = remember(items) { 
+        items.sortedBy { it.timestamp }.map { it.brand }.distinct() 
+    }
     
+    // 2. 如果超过 20 个，只取最后的 20 个（实现“覆盖第一个”的效果）
+    val displayBrandNames = remember(uniqueBrandNames) { 
+        uniqueBrandNames.takeLast(20) 
+    }
+    
+    // 3. 通过名字获取对应的 Brand 对象
+    val displayBrands = remember(displayBrandNames) { 
+        displayBrandNames.map { Catalog.brandOf(it) } 
+    }
+    
+    // 4. 固定 4 行 5 列 的网格
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        displayBrands.chunked(5).forEach { row ->
+        for (row in 0 until 4) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                row.forEach { brand ->
-                    val isUnlocked = unlockedBrands.contains(brand.name)
-                    if (isUnlocked) {
+                for (col in 0 until 5) {
+                    val index = row * 5 + col
+                    val brand = displayBrands.getOrNull(index)
+                    
+                    if (brand != null) {
+                        // 这里用完整的参数，确保你的自定义图片能显示
                         BrandBadge(
-    badge = brand.badge,
-    color = Color(brand.color),
-    size = 32.dp,
-    logo = brand.logo,
-    logoPath = brand.logoPath,  // 👈 新增
-    isCircle = brand.isCircle,  // 👈 新增
-    squircle = Catalog.isSquircle(brand.name)
-)
+                            badge = brand.badge,
+                            color = Color(brand.color),
+                            size = 32.dp,
+                            logo = brand.logo,
+                            logoPath = brand.logoPath,
+                            isCircle = brand.isCircle,
+                            squircle = Catalog.isSquircle(brand.name)
+                        )
                     } else {
+                        // 未点亮的灰点
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
@@ -238,12 +255,10 @@ val displayBrands = remember(customBrands) { Catalog.brands + customBrands }
                         )
                     }
                 }
-                repeat(5 - row.size) { Spacer(modifier = Modifier.size(32.dp)) }
             }
         }
     }
 }
-
 // ================= 其他组件 =================
 @Composable
 fun StatPill(label: String, value: String, accent: Color, modifier: Modifier = Modifier) {
