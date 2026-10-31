@@ -396,24 +396,32 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                 }
                 Spacer(Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        // 👈 1. 名字加上 weight(1f, fill=false)，空间不够时自动省略，绝不挤压后面的内容
-                        Text(
-                            text = displayName, 
-                            style = MaterialTheme.typography.titleMedium, 
-                            color = MaterialTheme.colorScheme.onSurface, 
-                            fontWeight = FontWeight.Bold, 
-                            maxLines = 1, 
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false) 
-                        )
-                        Spacer(Modifier.width(6.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        // 👈 1. 用一个外层 Row 包裹名字和星级，占用剩余所有空间
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            // 名字（还原原本的设置，正常显示）
+                            Text(
+                                text = displayName, 
+                                style = MaterialTheme.typography.titleMedium, 
+                                color = MaterialTheme.colorScheme.onSurface, 
+                                fontWeight = FontWeight.Bold, 
+                                maxLines = 1, 
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            
+                            // 星级紧贴名字右侧
+                            RatingStars(rating = tea.rating, starSize = 14.dp)
+                        }
                         
-                        // 👈 2. 星级紧贴名字右边
-                        RatingStars(rating = tea.rating, starSize = 14.dp)
+                        Spacer(Modifier.width(8.dp))
                         
-                        // 👈 3. 日期推到最右边，强制单行、去空格
-                        Spacer(Modifier.weight(1f))
+                        // 👈 2. 日期框：自动省略年份，避免占用过多空间导致名字被挤压
+                        val rawDate = TimeUtil.dayLabel(tea.timestamp)
+                        // 把类似 "2026年10月10日" 变成 "10月10日"
+                        val displayDate = rawDate.replace(Regex("\\d{4}年"), "").replace("\n", "").replace(" ", "")
+                        
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
@@ -421,7 +429,7 @@ private fun TeaRow(tea: Drink, onClick: () -> Unit, modifier: Modifier = Modifie
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = TimeUtil.dayLabel(tea.timestamp).replace(" ", "").replace("\n", ""), 
+                                text = displayDate, 
                                 style = MaterialTheme.typography.labelSmall, 
                                 color = PearlSoft,
                                 maxLines = 1,
