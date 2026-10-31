@@ -160,10 +160,12 @@ object Catalog {
     fun brandsOf(category: DrinkCategory): List<Brand> = brands
     
     // 👇 核心修改：优先查自定义品牌
-    fun brandOf(name: String): Brand = 
-        brands.firstOrNull { it.name == name } 
-        ?: extraBrands.firstOrNull { it.name == name } 
-        ?: brands.last()
+        fun brandOf(name: String): Brand {
+        val cleanName = name.trim()
+        return brands.firstOrNull { it.name.trim() == cleanName } 
+            ?: extraBrands.firstOrNull { it.name.trim() == cleanName } 
+            ?: brands.last()
+    }
         
     fun colorOf(name: String): Long = brandOf(name).color
     
