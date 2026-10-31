@@ -234,7 +234,26 @@ fun BrandManagerDialog(
                                 isCircle = isCircleCrop
                             )
                             
+                                                       // 1. 保存到本地数据
                             BrandStore.addBrand(context, newBrand)
+                            
+                            // 2. 让新添加的品牌排在第 16 个位置（第四行第一个）
+                            val currentNames = (Catalog.brands + customBrands + newBrand).map { it.name }.distinct().toMutableList()
+                            currentNames.remove(newBrand.name) // 先移除，确保不会重复
+                            
+                            // 第四行第一个的索引是 15 (0-4 是第一行，15 刚好是第四行开头)
+                            val targetIndex = 15
+                            if (currentNames.size >= targetIndex) {
+                                currentNames.add(targetIndex, newBrand.name)
+                            } else {
+                                // 如果总数还不到第四行，就直接追加到末尾
+                                currentNames.add(newBrand.name)
+                            }
+                            
+                            // 3. 保存新的排序并关掉弹窗
+                            savedOrder = currentNames
+                            saveBrandOrder(context, currentNames)
+
                             cropUri = null
                             showNameInput = false
                             newBrandName = ""
