@@ -40,7 +40,7 @@ class DrinkRepository(private val context: Context) {
         runCatching { file.writeText(json.encodeToString(list)) }
     }
 
-       // 👇 核心新增：静默自动上传 WebDAV
+    // 👇 核心新增：静默自动上传 WebDAV
     private fun triggerAutoSync() {
         val prefs = context.getSharedPreferences("webdav_prefs", Context.MODE_PRIVATE)
         val url = prefs.getString("url", "") ?: ""
@@ -68,16 +68,45 @@ class DrinkRepository(private val context: Context) {
                     brand.copy(logoPath = base64)
                 }
 
+                // 👈 核心新增：遍历提取照片数据并压缩转 Base64
+                val photoMap = mutableMapOf<String, String>()
+                _items.value.forEach { drink ->
+                    drink.photoPath?.let { fileName ->
+                        val imgFile = File(context.filesDir, fileName)
+                        if (imgFile.exists()) {
+                            val bitmap = android.graphics.BitmapFactory.decodeFile(imgFile.absolutePath)
+                            if (bitmap != null) {
+                                // 压缩到最大宽度/高度 500px，保留 PNG 以支持透明背景
+                                val scale = 500f / maxOf(bitmap.width, bitmap.height)
+                                val finalBitmap = if (scale < 1f) {
+                                    android.graphics.Bitmap.createScaledBitmap(
+                                        bitmap, 
+                                        (bitmap.width * scale).toInt(), 
+                                        (bitmap.height * scale).toInt(), 
+                                        true
+                                    )
+                                } else {
+                                    bitmap
+                                }
+                                val stream = java.io.ByteArrayOutputStream()
+                                finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 80, stream)
+                                photoMap[fileName] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
+                            }
+                        }
+                    }
+                }
+
                 val backup = BackupData(
                     drinks = _items.value,
                     customBrands = brandsWithBase64,
                     hiddenBrands = hiddenStr,
-                    brandOrder = orderStr
+                    brandOrder = orderStr,
+                    photoFiles = photoMap // 👈 把图片数据加入备份
                 )
                 
                 val jsonStr = json.encodeToString(BackupData.serializer(), backup)
 
-                // 👈 轮询：读取当前索引，上传到对应文件名，索引+1（1,2,3轮询）
+                // 轮询：读取当前索引，上传到对应文件名，索引+1（1,2,3轮询）
                 var index = prefs.getInt("auto_backup_index", 1)
                 if (index < 1 || index > 3) index = 1
                 val fileName = "naicha_backup_${index}.json"
