@@ -40,7 +40,23 @@ class DrinkRepository(private val context: Context) {
         runCatching { file.writeText(json.encodeToString(list)) }
     }
 
-    // 👈 核心新增：静默自动上传 WebDAV
+    // 👈 辅助函数：最稳妥的路径查找，兼容纯文件名和完整路径
+    private fun getActualFile(path: String?): File? {
+        if (path.isNullOrBlank()) return null
+        val cleanPath = path.trim()
+        
+        // 1. 尝试作为绝对路径（兼容自定义品牌图）
+        val f1 = File(cleanPath)
+        if (f1.exists()) return f1
+        
+        // 2. 尝试拼接在 App 私有目录下（兼容抠图照片的纯文件名）
+        val f2 = File(context.filesDir, cleanPath)
+        if (f2.exists()) return f2
+        
+        return null
+    }
+
+    // 👈 核心：静默自动上传 WebDAV
     private fun triggerAutoSync() {
         val prefs = context.getSharedPreferences("webdav_prefs", Context.MODE_PRIVATE)
         val url = prefs.getString("url", "") ?: ""
@@ -60,33 +76,32 @@ class DrinkRepository(private val context: Context) {
                 val jsonIgnore = Json { ignoreUnknownKeys = true }
                 val customBrands = try { jsonIgnore.decodeFromString<List<Brand>>(customBrandsStr) } catch (e: Exception) { emptyList() }
                 
+                // 1. 处理自定义品牌图片
                 val brandsWithBase64 = customBrands.map { brand ->
-                    val imgFile = brand.logoPath?.let { getActualFile(it) }
-                    val base64 = if (imgFile != null && imgFile.exists()) {
+                    val imgFile = getActualFile(brand.logoPath)
+                    val base64 = if (imgFile != null) {
                         "data:image/jpeg;base64," + android.util.Base64.encodeToString(imgFile.readBytes(), android.util.Base64.NO_WRAP)
                     } else ""
                     brand.copy(logoPath = base64)
                 }
 
-                // 👈 提取照片数据并压缩 (限制最近50张，防止服务器拒绝)
+                // 2. 提取抠好的饮品照片数据并压缩 (限制最近50张，防止服务器拒绝)
                 val photoMap = mutableMapOf<String, String>()
                 _items.value.take(50).forEach { drink ->
-                    drink.photoPath?.let { path ->
-                        val imgFile = getActualFile(path)
-                        if (imgFile != null && imgFile.exists()) {
-                            val bitmap = android.graphics.BitmapFactory.decodeFile(imgFile.absolutePath)
-                            if (bitmap != null) {
-                                // 强制压缩到最大宽度/高度 500px
-                                val scale = 500f / maxOf(bitmap.width, bitmap.height)
-                                val finalBitmap = if (scale < 1f) {
-                                    android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
-                                } else { bitmap }
-                                
-                                val stream = ByteArrayOutputStream()
-                                finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 70, stream)
-                                // 存储时使用纯文件名作为 key
-                                photoMap[imgFile.name] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
-                            }
+                    val imgFile = getActualFile(drink.photoPath)
+                    if (imgFile != null) {
+                        val bitmap = android.graphics.BitmapFactory.decodeFile(imgFile.absolutePath)
+                        if (bitmap != null) {
+                            // 强制压缩到最大宽度/高度 500px
+                            val scale = 500f / maxOf(bitmap.width, bitmap.height)
+                            val finalBitmap = if (scale < 1f) {
+                                android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+                            } else { bitmap }
+                            
+                            val stream = ByteArrayOutputStream()
+                            finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 70, stream)
+                            // 存储时使用纯文件名作为 key
+                            photoMap[imgFile.name] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
                         }
                     }
                 }
@@ -96,7 +111,7 @@ class DrinkRepository(private val context: Context) {
                     customBrands = brandsWithBase64,
                     hiddenBrands = hiddenStr,
                     brandOrder = orderStr,
-                    photoFiles = photoMap // 👈 把图片数据加入备份
+                    photoFiles = photoMap
                 )
                 
                 val jsonStr = json.encodeToString(BackupData.serializer(), backup)
@@ -115,15 +130,6 @@ class DrinkRepository(private val context: Context) {
                 e.printStackTrace()
             }
         }
-    }
-
-    // 👈 辅助函数：自动判断路径是绝对路径还是纯文件名
-    private fun getActualFile(path: String): File? {
-        val f1 = File(path)
-        if (f1.exists()) return f1
-        val f2 = File(context.filesDir, path)
-        if (f2.exists()) return f2
-        return null
     }
 
     fun add(item: Drink) {
