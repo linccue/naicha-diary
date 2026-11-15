@@ -213,7 +213,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
     var isWorking by remember { mutableStateOf(false) }
     var statusMsg by remember { mutableStateOf<String?>(null) }
 
-    // 👈 终极兼容：通过 PhotoStore 读取文件
     fun getActualFile(path: String?): File? {
         if (path.isNullOrBlank()) return null
         val cleanPath = path.trim()
@@ -329,13 +328,14 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                         if (imgFile != null) {
                                             val bitmap = android.graphics.BitmapFactory.decodeFile(imgFile.absolutePath)
                                             if (bitmap != null) {
-                                                val scale = 500f / maxOf(bitmap.width, bitmap.height)
+                                                // 👈 修改：尺寸 360f，格式 WEBP_LOSSY
+                                                val scale = 360f / maxOf(bitmap.width, bitmap.height)
                                                 val finalBitmap = if (scale < 1f) {
                                                     android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
                                                 } else { bitmap }
                                                 
                                                 val stream = ByteArrayOutputStream()
-                                                finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 70, stream)
+                                                finalBitmap.compress(android.graphics.Bitmap.CompressFormat.WEBP_LOSSY, 60, stream)
                                                 photoMap[imgFile.name] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
                                             }
                                         }
@@ -474,7 +474,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                                         BackupData(drinks = json.decodeFromString<List<Drink>>(jsonStr))
                                                     }
                                                     
-                                                    // 👈 还原时通过 PhotoStore 写回正确目录
                                                     var restoredPhotoCount = 0
                                                     backup.photoFiles.forEach { (photoName, base64) ->
                                                         try {
