@@ -42,6 +42,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 
@@ -205,9 +206,9 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
     val haptics = rememberHaptics()
     
     var confirmClear by remember { mutableStateOf(false) }
-    var showRestoreMenu by remember { mutableStateOf(false) } // 👈 控制选择备份的弹窗
-        var fileTimes by remember { mutableStateOf<Map<Int, String>>(emptyMap()) } // 存储时间
-    var isFetchingTimes by remember { mutableStateOf(false) } // 是否正在获取时间
+    var showRestoreMenu by remember { mutableStateOf(false) }
+    var fileTimes by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    var isFetchingTimes by remember { mutableStateOf(false) }
     
     val prefs = remember { context.getSharedPreferences("webdav_prefs", android.content.Context.MODE_PRIVATE) }
     var url by remember { mutableStateOf(prefs.getString("url", "") ?: "") }
@@ -309,17 +310,45 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                         brand.copy(logoPath = base64)
                                     }
 
+                                    // 👈 提取照片数据并压缩
+                                    val photoMap = mutableMapOf<String, String>()
+                                    items.forEach { drink ->
+                                        drink.photoPath?.let { fileName ->
+                                            val imgFile = File(context.filesDir, fileName)
+                                            if (imgFile.exists()) {
+                                                val bitmap = android.graphics.BitmapFactory.decodeFile(imgFile.absolutePath)
+                                                if (bitmap != null) {
+                                                    val scale = 500f / maxOf(bitmap.width, bitmap.height)
+                                                    val finalBitmap = if (scale < 1f) {
+                                                        android.graphics.Bitmap.createScaledBitmap(
+                                                            bitmap, 
+                                                            (bitmap.width * scale).toInt(), 
+                                                            (bitmap.height * scale).toInt(), 
+                                                            true
+                                                        )
+                                                    } else {
+                                                        bitmap
+                                                    }
+                                                    val stream = ByteArrayOutputStream()
+                                                    finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 80, stream)
+                                                    photoMap[fileName] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     val backup = BackupData(
                                         drinks = items,
                                         customBrands = brandsWithBase64,
                                         hiddenBrands = hiddenStr,
-                                        brandOrder = orderStr
+                                        brandOrder = orderStr,
+                                        photoFiles = photoMap // 👈 把图片数据加入备份
                                     )
                                     
                                     val json = Json { encodeDefaults = true }
                                     val jsonStr = json.encodeToString(BackupData.serializer(), backup)
                                     
-                                    // 👈 轮询逻辑
+                                    // 轮询逻辑
                                     var index = prefs.getInt("auto_backup_index", 1)
                                     if (index < 1 || index > 3) index = 1
                                     val fileName = "naicha_backup_${index}.json"
@@ -355,7 +384,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                             statusMsg = "请先填写完整的 WebDAV 配置"
                             return@GradientButton
                         }
-                        showRestoreMenu = true // 👈 打开选择菜单
+                        showRestoreMenu = true
                     },
                     colors = listOf(Taro, Color(0xFFCBBAF5))
                 )
@@ -386,6 +415,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
             colors = if (confirmClear) listOf(Color(0xFFE53935), Color(0xFFEF5350)) else listOf(Strawberry, Color(0xFFFFB3C6)),
         )
     }
+
     // 👈 当弹窗打开时，后台拉取 3 个文件的修改时间
     LaunchedEffect(showRestoreMenu) {
         if (showRestoreMenu) {
@@ -409,8 +439,8 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
             }
         }
     }
+
     // 👈 新增：选择要恢复的备份版本弹窗
-      // 👈 新增：选择要恢复的备份版本弹窗
     if (showRestoreMenu) {
         AlertDialog(
             onDismissRequest = { showRestoreMenu = false },
@@ -423,7 +453,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                         
                         Button(
                             onClick = {
-                                if (timeStr == "无备份") return@Button // 没有备份不让点
+                                if (timeStr == "无备份") return@Button
                                 
                                 showRestoreMenu = false
                                 isWorking = true
@@ -443,6 +473,13 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                                         BackupData(drinks = json.decodeFromString<List<Drink>>(jsonStr))
                                                     }
                                                     
+                                                    // 👈 还原照片文件
+                                                    backup.photoFiles.forEach { (photoName, base64) ->
+                                                        val bytes = android.util.Base64.decode(base64, android.util.Base64.NO_WRAP)
+                                                        val file = File(context.filesDir, photoName)
+                                                        file.writeBytes(bytes)
+                                                    }
+
                                                     DrinkRepository(context).replaceAll(backup.drinks)
                                                     
                                                     val restoredBrands = backup.customBrands.map { brand ->
