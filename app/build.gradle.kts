@@ -82,9 +82,9 @@ android {
                 "**/*.kotlin_builtins",
             )
         }
-        // 👈 新增：强制使用新打包方式以支持 16KB 对齐
         jniLibs {
-            useLegacyPackaging = false
+            // 如果你想强行压制 16KB 报错，可以暂时改成 true
+            useLegacyPackaging = false 
         }
     }
 
@@ -110,13 +110,17 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
     
-    // 👈 修改：升级到 1.22.0 版本以支持 16KB 对齐
+    // ONNX Runtime 保持支持 16KB 的 1.22.0 版本
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
     
-    implementation("androidx.camera:camera-core:1.3.4")
-    implementation("androidx.camera:camera-camera2:1.3.4")
-    implementation("androidx.camera:camera-lifecycle:1.3.4")
-    implementation("androidx.camera:camera-view:1.3.4")
+    // 👈 修改：将 CameraX 升级到 1.4.0 版本，解决 .so 库的 16KB 对齐问题
+    implementation("androidx.camera:camera-core:1.4.0")
+    implementation("androidx.camera:camera-camera2:1.4.0")
+    implementation("androidx.camera:camera-lifecycle:1.4.0")
+    implementation("androidx.camera:camera-view:1.4.0")
+    
+    // 👈 补充：显式引入最新版 graphics-path，解决最后那个 libandroidx.graphics.path.so 报错
+    implementation("androidx.graphics:graphics-path:1.0.1")
 }
 
 kotlin {
