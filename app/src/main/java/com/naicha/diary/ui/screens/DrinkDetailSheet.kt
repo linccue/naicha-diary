@@ -227,6 +227,8 @@ private fun DetailHeader(tea: Drink, accent: Color) {
                         color = accent,
                         size = 28.dp,
                         logo = brand.logo,
+                        logoPath = brand.logoPath, // 👈 修复：确保显示自定义品牌图片
+                        isCircle = brand.isCircle, // 👈 修复
                         squircle = Catalog.isSquircle(brand.name),
                     )
                     Spacer(Modifier.width(8.dp))
@@ -285,12 +287,13 @@ private fun InfoGrid(tea: Drink, accent: Color) {
         Spacer(Modifier.height(9.dp))
         LocalPhoto(
             file = PhotoStore.fileOf(photo),
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit, // 👈 修改：改为 Fit，完整显示不裁剪
             maxSize = 1080,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(230.dp)
-                .clip(MaterialTheme.shapes.large),
+                .clip(MaterialTheme.shapes.large)
+                .background(Color(0xFFF4F5F0)) // 👈 新增一点浅灰色背景，防止透明图片看不清
         )
     }
 }
@@ -322,4 +325,3 @@ private fun InfoCell(
         )
     }
 }
-
