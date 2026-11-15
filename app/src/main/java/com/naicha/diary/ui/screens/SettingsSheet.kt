@@ -217,11 +217,13 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
     var isWorking by remember { mutableStateOf(false) }
     var statusMsg by remember { mutableStateOf<String?>(null) }
 
-    // 辅助函数：自动判断路径
-    fun getActualFile(path: String): File? {
-        val f1 = File(path)
+    // 辅助函数：自动判断路径（兼容绝对路径和纯文件名）
+    fun getActualFile(path: String?): File? {
+        if (path.isNullOrBlank()) return null
+        val cleanPath = path.trim()
+        val f1 = File(cleanPath)
         if (f1.exists()) return f1
-        val f2 = File(context.filesDir, path)
+        val f2 = File(context.filesDir, cleanPath)
         if (f2.exists()) return f2
         return null
     }
@@ -312,30 +314,28 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                     val customBrands = try { jsonIgnore.decodeFromString<List<Brand>>(customBrandsStr) } catch (e: Exception) { emptyList() }
                                     
                                     val brandsWithBase64 = customBrands.map { brand ->
-                                        val file = brand.logoPath?.let { getActualFile(it) }
+                                        val file = getActualFile(brand.logoPath)
                                         val base64 = if (file != null && file.exists()) {
                                             "data:image/jpeg;base64," + android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
                                         } else ""
                                         brand.copy(logoPath = base64)
                                     }
 
-                                    // 👈 提取照片数据并压缩
+                                    // 👈 提取照片数据并压缩 (限制最近50张，防止服务器拒绝)
                                     val photoMap = mutableMapOf<String, String>()
                                     items.take(50).forEach { drink ->
-                                        drink.photoPath?.let { path ->
-                                            val imgFile = getActualFile(path)
-                                            if (imgFile != null && imgFile.exists()) {
-                                                val bitmap = android.graphics.BitmapFactory.decodeFile(imgFile.absolutePath)
-                                                if (bitmap != null) {
-                                                    val scale = 500f / maxOf(bitmap.width, bitmap.height)
-                                                    val finalBitmap = if (scale < 1f) {
-                                                        android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
-                                                    } else { bitmap }
-                                                    
-                                                    val stream = ByteArrayOutputStream()
-                                                    finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 70, stream)
-                                                    photoMap[imgFile.name] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
-                                                }
+                                        val imgFile = getActualFile(drink.photoPath)
+                                        if (imgFile != null) {
+                                            val bitmap = android.graphics.BitmapFactory.decodeFile(imgFile.absolutePath)
+                                            if (bitmap != null) {
+                                                val scale = 500f / maxOf(bitmap.width, bitmap.height)
+                                                val finalBitmap = if (scale < 1f) {
+                                                    android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+                                                } else { bitmap }
+                                                
+                                                val stream = ByteArrayOutputStream()
+                                                finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 70, stream)
+                                                photoMap[imgFile.name] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
                                             }
                                         }
                                     }
