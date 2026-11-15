@@ -16,10 +16,10 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 2
-            // 自动读取 GitHub Actions 的运行序号，如果没有则默认是 1
-    val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
-    versionCode = runNumber
-    versionName = "1.0.$runNumber"
+        // 自动读取 GitHub Actions 的运行序号，如果没有则默认是 1
+        val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = runNumber
+        versionName = "1.0.$runNumber"
     }
 
     androidResources {
@@ -82,6 +82,10 @@ android {
                 "**/*.kotlin_builtins",
             )
         }
+        // 👈 新增：强制使用新打包方式以支持 16KB 对齐
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 
     lint {
@@ -89,7 +93,6 @@ android {
         checkReleaseBuilds = false
     }
 }
-
 
 dependencies {
     implementation(libs.androidx.core.ktx)
@@ -106,8 +109,11 @@ dependencies {
     implementation(libs.haze)
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")
-implementation("androidx.camera:camera-core:1.3.4")
+    
+    // 👈 修改：升级到 1.22.0 版本以支持 16KB 对齐
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
+    
+    implementation("androidx.camera:camera-core:1.3.4")
     implementation("androidx.camera:camera-camera2:1.3.4")
     implementation("androidx.camera:camera-lifecycle:1.3.4")
     implementation("androidx.camera:camera-view:1.3.4")
