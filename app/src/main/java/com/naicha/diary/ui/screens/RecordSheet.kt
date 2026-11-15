@@ -430,7 +430,8 @@ fun RecordSheet(
                                 } else if (previewBitmap != null) {
                                     Image(
                                         bitmap = previewBitmap!!.asImageBitmap(), contentDescription = "照片",
-                                        contentScale = ContentScale.Crop, modifier = Modifier.size(84.dp).clip(MaterialTheme.shapes.medium)
+                                        contentScale = ContentScale.Fit, 
+                                        modifier = Modifier.size(84.dp).clip(MaterialTheme.shapes.medium)
                                     )
                                     Spacer(Modifier.width(12.dp))
                                 }
