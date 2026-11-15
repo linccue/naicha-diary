@@ -217,6 +217,15 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
     var isWorking by remember { mutableStateOf(false) }
     var statusMsg by remember { mutableStateOf<String?>(null) }
 
+    // 辅助函数：自动判断路径
+    fun getActualFile(path: String): File? {
+        val f1 = File(path)
+        if (f1.exists()) return f1
+        val f2 = File(context.filesDir, path)
+        if (f2.exists()) return f2
+        return null
+    }
+
     SoftCard {
         SectionHeader(title = "我的数据", subtitle = "全部存在本机")
         Spacer(Modifier.height(12.dp))
@@ -303,7 +312,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                     val customBrands = try { jsonIgnore.decodeFromString<List<Brand>>(customBrandsStr) } catch (e: Exception) { emptyList() }
                                     
                                     val brandsWithBase64 = customBrands.map { brand ->
-                                        val file = brand.logoPath?.let { File(it) }
+                                        val file = brand.logoPath?.let { getActualFile(it) }
                                         val base64 = if (file != null && file.exists()) {
                                             "data:image/jpeg;base64," + android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
                                         } else ""
@@ -312,26 +321,20 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
 
                                     // 👈 提取照片数据并压缩
                                     val photoMap = mutableMapOf<String, String>()
-                                    items.forEach { drink ->
-                                        drink.photoPath?.let { fileName ->
-                                            val imgFile = File(context.filesDir, fileName)
-                                            if (imgFile.exists()) {
+                                    items.take(50).forEach { drink ->
+                                        drink.photoPath?.let { path ->
+                                            val imgFile = getActualFile(path)
+                                            if (imgFile != null && imgFile.exists()) {
                                                 val bitmap = android.graphics.BitmapFactory.decodeFile(imgFile.absolutePath)
                                                 if (bitmap != null) {
                                                     val scale = 500f / maxOf(bitmap.width, bitmap.height)
                                                     val finalBitmap = if (scale < 1f) {
-                                                        android.graphics.Bitmap.createScaledBitmap(
-                                                            bitmap, 
-                                                            (bitmap.width * scale).toInt(), 
-                                                            (bitmap.height * scale).toInt(), 
-                                                            true
-                                                        )
-                                                    } else {
-                                                        bitmap
-                                                    }
+                                                        android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+                                                    } else { bitmap }
+                                                    
                                                     val stream = ByteArrayOutputStream()
-                                                    finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 80, stream)
-                                                    photoMap[fileName] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
+                                                    finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 70, stream)
+                                                    photoMap[imgFile.name] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
                                                 }
                                             }
                                         }
@@ -342,13 +345,12 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                         customBrands = brandsWithBase64,
                                         hiddenBrands = hiddenStr,
                                         brandOrder = orderStr,
-                                        photoFiles = photoMap // 👈 把图片数据加入备份
+                                        photoFiles = photoMap
                                     )
                                     
                                     val json = Json { encodeDefaults = true }
                                     val jsonStr = json.encodeToString(BackupData.serializer(), backup)
                                     
-                                    // 轮询逻辑
                                     var index = prefs.getInt("auto_backup_index", 1)
                                     if (index < 1 || index > 3) index = 1
                                     val fileName = "naicha_backup_${index}.json"
@@ -359,7 +361,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                             val nextIndex = if (index >= 3) 1 else index + 1
                                             prefs.edit().putInt("auto_backup_index", nextIndex).apply()
                                             
-                                            statusMsg = "✅ 已备份为版本 $index"
+                                            statusMsg = "✅ 已备份为版本 $index (含 ${photoMap.size} 张图片)"
                                             haptics.confirm()
                                         } else {
                                             statusMsg = "❌ ${res.exceptionOrNull()?.message}"
@@ -416,7 +418,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         )
     }
 
-    // 👈 当弹窗打开时，后台拉取 3 个文件的修改时间
     LaunchedEffect(showRestoreMenu) {
         if (showRestoreMenu) {
             isFetchingTimes = true
@@ -440,7 +441,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
         }
     }
 
-    // 👈 新增：选择要恢复的备份版本弹窗
     if (showRestoreMenu) {
         AlertDialog(
             onDismissRequest = { showRestoreMenu = false },
@@ -474,10 +474,14 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                                     }
                                                     
                                                     // 👈 还原照片文件
+                                                    var restoredPhotoCount = 0
                                                     backup.photoFiles.forEach { (photoName, base64) ->
-                                                        val bytes = android.util.Base64.decode(base64, android.util.Base64.NO_WRAP)
-                                                        val file = File(context.filesDir, photoName)
-                                                        file.writeBytes(bytes)
+                                                        try {
+                                                            val bytes = android.util.Base64.decode(base64, android.util.Base64.NO_WRAP)
+                                                            val file = File(context.filesDir, photoName)
+                                                            file.writeBytes(bytes)
+                                                            restoredPhotoCount++
+                                                        } catch (e: Exception) { e.printStackTrace() }
                                                     }
 
                                                     DrinkRepository(context).replaceAll(backup.drinks)
@@ -505,7 +509,7 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                                     
                                                     BrandStore.reload(context)
                                                     
-                                                    statusMsg = "✅ 版本 $version 还原成功！"
+                                                    statusMsg = "✅ 版本 $version 还原成功！(含 $restoredPhotoCount 张图)"
                                                     haptics.confirm()
                                                 } catch (e: Exception) {
                                                     statusMsg = "❌ 数据解析失败: ${e.message}"
