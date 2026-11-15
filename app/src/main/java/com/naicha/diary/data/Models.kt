@@ -247,4 +247,5 @@ data class BackupData(
     val customBrands: List<Brand> = emptyList(),
     val hiddenBrands: String = "",
     val brandOrder: String = ""
+    val photoFiles: Map<String, String> = emptyMap()
 )
