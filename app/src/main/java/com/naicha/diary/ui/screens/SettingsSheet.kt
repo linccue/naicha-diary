@@ -30,12 +30,8 @@ import com.naicha.diary.ui.components.AbstinenceTracker
 import com.naicha.diary.ui.components.GradientButton
 import com.naicha.diary.ui.components.SectionHeader
 import com.naicha.diary.ui.components.SoftCard
-import com.naicha.diary.ui.theme.Caramel
-import com.naicha.diary.ui.theme.Matcha
-import com.naicha.diary.ui.theme.Outline
-import com.naicha.diary.ui.theme.PearlSoft
-import com.naicha.diary.ui.theme.Strawberry
-import com.naicha.diary.ui.theme.Taro
+import com.naicha.diary.ui.theme.*
+import com.naicha.diary.util.PhotoStore
 import com.naicha.diary.util.WebDavClient
 import com.naicha.diary.util.rememberHaptics
 import kotlinx.coroutines.Dispatchers
@@ -217,15 +213,21 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
     var isWorking by remember { mutableStateOf(false) }
     var statusMsg by remember { mutableStateOf<String?>(null) }
 
-    // 辅助函数：自动判断路径（兼容绝对路径和纯文件名）
+    // 👈 终极兼容：通过 PhotoStore 读取文件
     fun getActualFile(path: String?): File? {
         if (path.isNullOrBlank()) return null
         val cleanPath = path.trim()
-        val f1 = File(cleanPath)
-        if (f1.exists()) return f1
-        val f2 = File(context.filesDir, cleanPath)
-        if (f2.exists()) return f2
-        return null
+        val directFile = File(cleanPath)
+        if (directFile.exists() && directFile.isFile) return directFile
+
+        val fileName = if (cleanPath.contains("/")) cleanPath.substringAfterLast("/") else cleanPath
+        return try {
+            val storeFile = PhotoStore.fileOf(fileName)
+            if (storeFile.exists()) storeFile else null
+        } catch (e: Exception) {
+            val fallback = File(context.filesDir, fileName)
+            if (fallback.exists()) fallback else null
+        }
     }
 
     SoftCard {
@@ -321,7 +323,6 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                         brand.copy(logoPath = base64)
                                     }
 
-                                    // 👈 提取照片数据并压缩 (限制最近50张，防止服务器拒绝)
                                     val photoMap = mutableMapOf<String, String>()
                                     items.take(50).forEach { drink ->
                                         val imgFile = getActualFile(drink.photoPath)
@@ -473,13 +474,17 @@ private fun SettingsDataCard(items: List<Drink>, onClearAll: () -> Unit) {
                                                         BackupData(drinks = json.decodeFromString<List<Drink>>(jsonStr))
                                                     }
                                                     
-                                                    // 👈 还原照片文件
+                                                    // 👈 还原时通过 PhotoStore 写回正确目录
                                                     var restoredPhotoCount = 0
                                                     backup.photoFiles.forEach { (photoName, base64) ->
                                                         try {
                                                             val bytes = android.util.Base64.decode(base64, android.util.Base64.NO_WRAP)
-                                                            val file = File(context.filesDir, photoName)
-                                                            file.writeBytes(bytes)
+                                                            val targetFile = try {
+                                                                PhotoStore.fileOf(photoName)
+                                                            } catch (e: Exception) {
+                                                                File(context.filesDir, photoName)
+                                                            }
+                                                            targetFile.writeBytes(bytes)
                                                             restoredPhotoCount++
                                                         } catch (e: Exception) { e.printStackTrace() }
                                                     }
