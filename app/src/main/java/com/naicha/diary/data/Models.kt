@@ -83,6 +83,7 @@ object Catalog {
         Brand("煲珠公", DrinkCategory.MilkTea, 0xFF3A3EC5, "煲", R.drawable.logo_baozhugong),
         Brand("陈文鼎", DrinkCategory.MilkTea, 0xFF8B4A2B, "陈", R.drawable.logo_chenwending),
         Brand("瑞幸咖啡", DrinkCategory.Coffee, 0xFF1C3F94, "瑞", R.drawable.logo_luckin),
+        
         Brand("古茗", DrinkCategory.MilkTea, 0xFF2B2B2B, "古", R.drawable.logo_guming),
         Brand("沪上阿姨", DrinkCategory.MilkTea, 0xFFC7303E, "沪", R.drawable.logo_hushangayi),
         Brand("茶百道", DrinkCategory.MilkTea, 0xFF2E86DE, "茶", R.drawable.logo_chabaidao),
@@ -132,6 +133,7 @@ object Catalog {
         Brand("茉沏", DrinkCategory.MilkTea, 0xFF7F8C8D, "茉", R.drawable.logo_moqi),
         Brand("让茶", DrinkCategory.MilkTea, 0xFF27AE60, "让", R.drawable.logo_rangcha),
         Brand("真茶屋", DrinkCategory.MilkTea, 0xFF2ECC71, "真", R.drawable.logo_zhenchawu),
+        
         Brand("星巴克", DrinkCategory.Coffee, 0xFF00704A, "星", R.drawable.logo_starbucks),
         Brand("库迪咖啡", DrinkCategory.Coffee, 0xFFE2231A, "库", R.drawable.logo_cotti),
         Brand("Manner", DrinkCategory.Coffee, 0xFFC59B5F, "M", R.drawable.logo_manner),
@@ -140,10 +142,10 @@ object Catalog {
         Brand("Peet's", DrinkCategory.Coffee, 0xFF1D4E4F, "P", R.drawable.logo_peets),
         Brand("挪瓦咖啡", DrinkCategory.Coffee, 0xFFEB6B2A, "挪", R.drawable.logo_nowwa),
         Brand("幸运咖", DrinkCategory.Coffee, 0xFFF4B223, "幸", R.drawable.logo_luckycup),
+        
         Brand("自制 / 其他", DrinkCategory.MilkTea, 0xFF8D6E63, "自", R.drawable.logo_mixue)
     )
 
-    // 👇 核心新增：让全局能查到你添加的自定义品牌
     var extraBrands: List<Brand> = emptyList()
 
     val commonNames = mapOf(
@@ -159,19 +161,16 @@ object Catalog {
 
     fun brandsOf(category: DrinkCategory): List<Brand> = brands
     
-    // 👇 核心修改：优先查自定义品牌
-        fun brandOf(name: String): Brand {
-        return brands.firstOrNull { it.name == name }
-            ?: BrandStore.customBrands.value.firstOrNull { it.name == name }
-            ?: brands.last()
-    }
+    fun brandOf(name: String): Brand = 
+        brands.firstOrNull { it.name == name } 
+        ?: extraBrands.firstOrNull { it.name == name } 
+        ?: brands.last()
         
     fun colorOf(name: String): Long = brandOf(name).color
     
-    // 👇 核心修改：让自定义的方形图标也能生效
     fun isSquircle(name: String): Boolean {
         if (name in setOf("喜茶", "奈雪的茶", "霸王茶姬", "陈文鼎", "煲珠公")) return true
-        val custom = BrandStore.customBrands.value.firstOrNull { it.name == name }
+        val custom = extraBrands.firstOrNull { it.name == name }
         return custom?.let { !it.isCircle } ?: false
     }
     
@@ -200,7 +199,7 @@ object BrandStore {
         if (customStr.isNotEmpty()) {
             try { 
                 _customBrands.value = gson.decodeFromString(customStr) 
-                Catalog.extraBrands = _customBrands.value // 👈 同步给 Catalog
+                Catalog.extraBrands = _customBrands.value
             } catch (e: Exception) {}
         }
         
@@ -209,22 +208,21 @@ object BrandStore {
             _hiddenBrands.value = hiddenStr.split(",").toSet()
         }
     }
-  fun reload(context: android.content.Context) {
+
+    fun reload(context: android.content.Context) {
         prefs = null
         init(context)
-        // 同时更新排序
-        val orderPrefs = context.getSharedPreferences("naicha_brand_order_prefs", android.content.Context.MODE_PRIVATE)
-        // 此处仅作触发，具体在还原时重新读取即可
     }
+
     fun addBrand(context: android.content.Context, brand: Brand) {
         _customBrands.value = _customBrands.value + brand
-        Catalog.extraBrands = _customBrands.value // 👈 同步给 Catalog
+        Catalog.extraBrands = _customBrands.value
         prefs?.edit()?.putString("custom", kotlinx.serialization.json.Json.encodeToString(_customBrands.value))?.apply()
     }
 
     fun deleteBrands(context: android.content.Context, names: Set<String>) {
         _customBrands.value = _customBrands.value.filterNot { names.contains(it.name) }
-        Catalog.extraBrands = _customBrands.value // 👈 同步给 Catalog
+        Catalog.extraBrands = _customBrands.value
         prefs?.edit()?.putString("custom", kotlinx.serialization.json.Json.encodeToString(_customBrands.value))?.apply()
         
         val catalogNames = Catalog.brands.map { it.name }.toSet()
@@ -241,11 +239,13 @@ object BrandStore {
         prefs?.edit()?.putString("hidden", current.joinToString(","))?.apply()
     }
 }
+
+// 👈 新增：备份数据结构，加了图片数据字段
 @Serializable
 data class BackupData(
     val drinks: List<Drink> = emptyList(),
     val customBrands: List<Brand> = emptyList(),
     val hiddenBrands: String = "",
-    val brandOrder: String = ""
+    val brandOrder: String = "",
     val photoFiles: Map<String, String> = emptyMap()
 )
