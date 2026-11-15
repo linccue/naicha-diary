@@ -41,11 +41,9 @@ class DrinkRepository(private val context: Context) {
         runCatching { file.writeText(json.encodeToString(list)) }
     }
 
-    // 👈 终极兼容：通过 PhotoStore 提取文件
     private fun getActualFile(path: String?): File? {
         if (path.isNullOrBlank()) return null
         val cleanPath = path.trim()
-        
         val directFile = File(cleanPath)
         if (directFile.exists() && directFile.isFile) return directFile
 
@@ -92,13 +90,15 @@ class DrinkRepository(private val context: Context) {
                     if (imgFile != null) {
                         val bitmap = android.graphics.BitmapFactory.decodeFile(imgFile.absolutePath)
                         if (bitmap != null) {
-                            val scale = 500f / maxOf(bitmap.width, bitmap.height)
+                            // 👈 修改 1：将尺寸限制缩小到 360f
+                            val scale = 360f / maxOf(bitmap.width, bitmap.height)
                             val finalBitmap = if (scale < 1f) {
                                 android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
                             } else { bitmap }
                             
                             val stream = ByteArrayOutputStream()
-                            finalBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 70, stream)
+                            // 👈 修改 2：将 PNG 改为 WEBP_LOSSY，质量 60
+                            finalBitmap.compress(android.graphics.Bitmap.CompressFormat.WEBP_LOSSY, 60, stream)
                             photoMap[imgFile.name] = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
                         }
                     }
